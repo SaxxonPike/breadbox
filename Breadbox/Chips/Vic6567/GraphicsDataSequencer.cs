@@ -13,10 +13,32 @@ namespace Breadbox.Chips.Vic6567
     public class GraphicsDataSequencer
     {
         private int _buffer;
+        private int _multiColorFlipFlop;
 
         private Expression Buffer
         {
             get { return Util.Member(() => _buffer); }
+        }
+
+        private Expression MultiColorFlipFlop
+        {
+            get { return Util.Member(() => _multiColorFlipFlop); }
+        }
+
+        public Expression LoadBuffer(Expression value)
+        {
+            return Expression.Block(
+                Expression.Assign(Buffer, value),
+                Expression.Assign(MultiColorFlipFlop, Expression.Constant(false)));
+        }
+
+        public Expression Shift(Expression mcm, Expression bmm, Expression color)
+        {
+            return Expression.IfThenElse(IsMulticolorOutput(mcm, bmm, color),
+                Expression.Block(
+                    Expression.IfThen(MultiColorFlipFlop, Expression.LeftShiftAssign(Buffer, Expression.Constant(2))),
+                    Expression.Assign(MultiColorFlipFlop, Expression.Not(MultiColorFlipFlop))),
+                Expression.LeftShiftAssign(Buffer, Expression.Constant(1)));
         }
 
         private Expression HasMulticolorBitSet(Expression color)

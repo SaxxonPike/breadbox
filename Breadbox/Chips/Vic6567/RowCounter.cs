@@ -12,16 +12,21 @@ namespace Breadbox.Chips.Vic6567
     /// </summary>
     public class RowCounter
     {
-        private int Value { get; set; }
+        private int _rc;
+
+        private Expression Rc
+        {
+            get { return Util.Member(() => _rc); }
+        }
 
         public Expression Reset
         {
-            get { return Expression.Assign(Util.Member(() => Value), Expression.Constant(0)); }
+            get { return Expression.Assign(Rc, Expression.Constant(0)); }
         }
 
         public Expression Increment
         {
-            get { return Expression.Assign(Util.Member(() => Value), Expression.And(Expression.Increment(Util.Member(() => Value)), Expression.Constant(0x7))); }
+            get { return Expression.Assign(Rc, Expression.And(Expression.Increment(Rc), Expression.Constant(0x7))); }
         }
     }
 }
