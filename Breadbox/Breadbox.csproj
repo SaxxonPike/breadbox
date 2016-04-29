@@ -1,0 +1,77 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{232EEB40-3315-4D66-99C6-9409D1186328}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Breadbox</RootNamespace>
+    <AssemblyName>Breadbox</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Builders\BusBuilder.cs" />
+    <Compile Include="Builders\CellBuilder.cs" />
+    <Compile Include="Builders\MemoryBuilder.cs" />
+    <Compile Include="Chips\Vic6567\GraphicsAddressGenerator.cs" />
+    <Compile Include="Chips\Vic6567\GraphicsDataSequencer.cs" />
+    <Compile Include="Chips\Vic6567\MobCounter.cs" />
+    <Compile Include="Chips\Vic6567\MobDataBuffer.cs" />
+    <Compile Include="Chips\Vic6567\RasterCounter.cs" />
+    <Compile Include="Chips\Vic6567\RefreshAddressGenerator.cs" />
+    <Compile Include="Chips\Vic6567\RowCounter.cs" />
+    <Compile Include="Chips\Vic6567\VideoMatrixCounter.cs" />
+    <Compile Include="Chips\Vic6567\VideoMatrixMemory.cs" />
+    <Compile Include="Extensions\ExpressionExtensions.cs" />
+    <Compile Include="Extensions\ReadWriteableExtensions.cs" />
+    <Compile Include="Extensions\Util.cs" />
+    <Compile Include="Interfaces\IBus.cs" />
+    <Compile Include="Interfaces\IReadable.cs" />
+    <Compile Include="Interfaces\IReadableAddressable.cs" />
+    <Compile Include="Interfaces\IReadWriteable.cs" />
+    <Compile Include="Interfaces\IReadWriteableAddressable.cs" />
+    <Compile Include="Interfaces\IWriteable.cs" />
+    <Compile Include="Interfaces\IWriteableAddressable.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Chips\Cpu6502\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
