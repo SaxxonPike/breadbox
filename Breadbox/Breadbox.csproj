@@ -53,6 +53,7 @@
     <Compile Include="Chips\Vic6567\Registers.cs" />
     <Compile Include="Chips\Vic6567\RowCounter.cs" />
     <Compile Include="Chips\Vic6567\SpriteAddressGenerator.cs" />
+    <Compile Include="Chips\Vic6567\SyncGenerator.cs" />
     <Compile Include="Chips\Vic6567\VideoMatrixCounter.cs" />
     <Compile Include="Chips\Vic6567\VideoMatrixMemory.cs" />
     <Compile Include="Chips\Vic6567\VideoOutput.cs" />
