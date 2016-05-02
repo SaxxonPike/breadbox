@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
+﻿using System.Linq.Expressions;
 using Breadbox.Extensions;
+
 #pragma warning disable 649
 
-namespace Breadbox.Chips.Vic6567
+namespace Breadbox.Chips.Vic2
 {
     public class Vic2State
     {
@@ -171,10 +168,34 @@ namespace Breadbox.Chips.Vic6567
         private int _vcBase;
         private int _vmli;
         private readonly int[] _videoMemory = new int[64];
+        private bool _ba;
+        private bool _aec;
+        private bool _lp;
+        private int _address;
 
         public IndexExpression VideoMemory(Expression index)
         {
             return Expression.ArrayAccess(Util.Member(() => _videoMemory), index);
+        }
+
+        public MemberExpression Address
+        {
+            get { return Util.Member(() => _address); }
+        }
+
+        public MemberExpression BA
+        {
+            get { return Util.Member(() => _ba); }
+        }
+
+        public MemberExpression AEC
+        {
+            get { return Util.Member(() => _aec); }
+        }
+
+        public MemberExpression LP
+        {
+            get { return Util.Member(() => _lp); }
         }
 
         public MemberExpression VC

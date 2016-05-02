@@ -1,7 +1,7 @@
 ﻿using System.Linq.Expressions;
 using Breadbox.Extensions;
 
-namespace Breadbox.Chips.Vic6567
+namespace Breadbox.Chips.Vic2
 {
     /// <summary>
     /// Emulates graphics data sequencer (non-sprite).

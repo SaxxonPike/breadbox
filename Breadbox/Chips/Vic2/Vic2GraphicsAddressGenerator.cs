@@ -1,6 +1,6 @@
 ﻿using System.Linq.Expressions;
 
-namespace Breadbox.Chips.Vic6567
+namespace Breadbox.Chips.Vic2
 {
     public static class Vic2GraphicsAddressGenerator
     {

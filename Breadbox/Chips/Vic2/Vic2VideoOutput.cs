@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
+﻿using System.Drawing;
 using System.Linq.Expressions;
-using System.Text;
 
-namespace Breadbox.Chips.Vic6567
+namespace Breadbox.Chips.Vic2
 {
     public static class Vic2VideoOutput
     {

@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
+﻿using System.Linq.Expressions;
 using Breadbox.Extensions;
 
-namespace Breadbox.Chips.Vic6567
+namespace Breadbox.Chips.Vic2
 {
     public static class Vic2BorderUnit
     {

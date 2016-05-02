@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
-using Breadbox.Chips.Vic6567;
+using Breadbox.Chips.Vic2;
 using NUnit.Framework;
 using Stopwatch = NUnit.Framework.Compatibility.Stopwatch;
 
@@ -61,6 +61,7 @@ namespace Breadbox.Test.Chips.Vic6567
 
             var muxOutput = Vic2Mux.OutputColor(spriteDatas, spriteColors, spritePriorities, graphicsDataOutput, graphicsColorOutput);
             var borderOutput = Vic2BorderUnit.OutputColor(registers.MainBorderFlipFlop, registers.VerticalBorderFlipFlop, muxOutput, registers.EC);
+            var videoOutput = Vic2VideoOutput.OutputRGB(borderOutput);
 
             var f = Expression.Lambda<Func<int, int>>(borderOutput, gColor).Compile();
             f(0);
