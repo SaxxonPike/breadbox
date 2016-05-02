@@ -6,26 +6,26 @@ using System.Text;
 
 namespace Breadbox.Chips.Vic6567
 {
-    public class Mux
+    public static class Vic2Mux
     {
-        private Expression IsGraphicsOutputtingForegroundColor(Expression graphicsData)
+        private static Expression IsGraphicsOutputtingForegroundColor(Expression graphicsData)
         {
             return Expression.GreaterThanOrEqual(graphicsData, Expression.Constant(0x02));
         }
 
-        private Expression IsSpriteOutputtingColor(Expression spriteData)
+        private static Expression IsSpriteOutputtingColor(Expression spriteData)
         {
             return Expression.NotEqual(spriteData, Expression.Constant(0));
         }
 
-        private Expression MuxedColor(Expression spritePriority, Expression spriteColor, Expression graphicsData, Expression graphicsColor)
+        private static Expression MuxedColor(Expression spritePriority, Expression spriteColor, Expression graphicsData, Expression graphicsColor)
         {
             return Expression.Condition(spritePriority,
                 Expression.Condition(IsGraphicsOutputtingForegroundColor(graphicsData), graphicsColor, spriteColor),
                 spriteColor);
         }
 
-        public Expression OutputSpriteSpriteCollisions(IEnumerable<Expression> spriteDatas)
+        public static Expression OutputSpriteSpriteCollisions(IEnumerable<Expression> spriteDatas)
         {
             var allCollisions = spriteDatas.Select((sd, i) => Expression.Condition(IsSpriteOutputtingColor(sd), Expression.Constant(1 << i), Expression.Constant(0)) as Expression).Aggregate(Expression.Or);
             return Expression.Switch(allCollisions, allCollisions,
@@ -33,14 +33,14 @@ namespace Breadbox.Chips.Vic6567
                 Expression.Constant(0x10), Expression.Constant(0x20), Expression.Constant(0x40), Expression.Constant(0x80)));
         }
 
-        public Expression OutputSpriteBackgroundCollisions(IEnumerable<Expression> spriteDatas, Expression graphicsData)
+        public static Expression OutputSpriteBackgroundCollisions(IEnumerable<Expression> spriteDatas, Expression graphicsData)
         {
             var allCollisions = spriteDatas.Select((sd, i) => Expression.Condition(IsSpriteOutputtingColor(sd), Expression.Constant(1 << i), Expression.Constant(0)) as Expression).Aggregate(Expression.Or);
             return Expression.Condition(IsGraphicsOutputtingForegroundColor(graphicsData), allCollisions,
                 Expression.Constant(0x00));
         }
 
-        public Expression OutputColor(IList<Expression> spriteDatas, IList<Expression> spriteColors, IList<Expression> spritePriorities, Expression graphicsData,
+        public static Expression OutputColor(IList<Expression> spriteDatas, IList<Expression> spriteColors, IList<Expression> spritePriorities, Expression graphicsData,
             Expression graphicsColor)
         {
             var cachedGraphicsData = Expression.Variable(typeof(int));

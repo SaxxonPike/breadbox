@@ -16,47 +16,30 @@ namespace Breadbox.Test.Chips.Vic6567
         [Test]
         public void Test1()
         {
-            var registers = new Registers();
-            var border = new BorderUnit();
-            var mux = new Mux();
-            var graphicsDataSequencer = new GraphicsDataSequencer();
-            var videoMemory = new VideoMatrixMemory();
-            var videoCounter = new VideoMatrixCounter();
+            var registers = new Vic2State();
 
-            var spriteDataSequencers = new[]
+            var spriteDatas = new[]
             {
-                new MobDataSequencer(),
-                new MobDataSequencer(),
-                new MobDataSequencer(),
-                new MobDataSequencer(),
-                new MobDataSequencer(),
-                new MobDataSequencer(),
-                new MobDataSequencer(),
-                new MobDataSequencer()
+                Vic2MobDataSequencer.OutputData(registers.MobBuffer0, registers.M0MC),
+                Vic2MobDataSequencer.OutputData(registers.MobBuffer1, registers.M1MC),
+                Vic2MobDataSequencer.OutputData(registers.MobBuffer2, registers.M2MC),
+                Vic2MobDataSequencer.OutputData(registers.MobBuffer3, registers.M3MC),
+                Vic2MobDataSequencer.OutputData(registers.MobBuffer4, registers.M4MC),
+                Vic2MobDataSequencer.OutputData(registers.MobBuffer5, registers.M5MC),
+                Vic2MobDataSequencer.OutputData(registers.MobBuffer6, registers.M6MC),
+                Vic2MobDataSequencer.OutputData(registers.MobBuffer7, registers.M7MC),
             };
 
-            var spriteDatas = new Expression[]
+            var spriteColors = new[]
             {
-                spriteDataSequencers[0].OutputData(registers.M0MC),
-                spriteDataSequencers[1].OutputData(registers.M1MC),
-                spriteDataSequencers[2].OutputData(registers.M2MC),
-                spriteDataSequencers[3].OutputData(registers.M3MC),
-                spriteDataSequencers[4].OutputData(registers.M4MC),
-                spriteDataSequencers[5].OutputData(registers.M5MC),
-                spriteDataSequencers[6].OutputData(registers.M6MC),
-                spriteDataSequencers[7].OutputData(registers.M7MC)
-            };
-
-            var spriteColors = new Expression[]
-            {
-                spriteDataSequencers[0].OutputColor(registers.M0MC, registers.M0C, registers.MM0, registers.MM1),
-                spriteDataSequencers[1].OutputColor(registers.M1MC, registers.M1C, registers.MM0, registers.MM1),
-                spriteDataSequencers[2].OutputColor(registers.M2MC, registers.M2C, registers.MM0, registers.MM1),
-                spriteDataSequencers[3].OutputColor(registers.M3MC, registers.M3C, registers.MM0, registers.MM1),
-                spriteDataSequencers[4].OutputColor(registers.M4MC, registers.M4C, registers.MM0, registers.MM1),
-                spriteDataSequencers[5].OutputColor(registers.M5MC, registers.M5C, registers.MM0, registers.MM1),
-                spriteDataSequencers[6].OutputColor(registers.M6MC, registers.M6C, registers.MM0, registers.MM1),
-                spriteDataSequencers[7].OutputColor(registers.M7MC, registers.M7C, registers.MM0, registers.MM1)
+                Vic2MobDataSequencer.OutputColor(registers.MobBuffer0, registers.M0MC, registers.M0C, registers.MM0, registers.MM1),
+                Vic2MobDataSequencer.OutputColor(registers.MobBuffer1, registers.M1MC, registers.M1C, registers.MM0, registers.MM1),
+                Vic2MobDataSequencer.OutputColor(registers.MobBuffer2, registers.M2MC, registers.M2C, registers.MM0, registers.MM1),
+                Vic2MobDataSequencer.OutputColor(registers.MobBuffer3, registers.M3MC, registers.M3C, registers.MM0, registers.MM1),
+                Vic2MobDataSequencer.OutputColor(registers.MobBuffer4, registers.M4MC, registers.M4C, registers.MM0, registers.MM1),
+                Vic2MobDataSequencer.OutputColor(registers.MobBuffer5, registers.M5MC, registers.M5C, registers.MM0, registers.MM1),
+                Vic2MobDataSequencer.OutputColor(registers.MobBuffer6, registers.M6MC, registers.M6C, registers.MM0, registers.MM1),
+                Vic2MobDataSequencer.OutputColor(registers.MobBuffer7, registers.M7MC, registers.M7C, registers.MM0, registers.MM1)
             };
 
             var spritePriorities = new Expression[]
@@ -73,11 +56,11 @@ namespace Breadbox.Test.Chips.Vic6567
 
             var gColor = Expression.Parameter(typeof(int), "GColor");
 
-            var graphicsDataOutput = graphicsDataSequencer.OutputData(registers.BMM, registers.MCM, gColor);
-            var graphicsColorOutput = graphicsDataSequencer.OutputColor(registers.B0C, registers.B1C, registers.B2C, registers.B3C, gColor, registers.BMM, registers.ECM, registers.MCM);
+            var graphicsDataOutput = Vic2GraphicsDataSequencer.OutputData(registers.GraphicsBuffer, registers.BMM, registers.MCM, gColor);
+            var graphicsColorOutput = Vic2GraphicsDataSequencer.OutputColor(registers.GraphicsBuffer, registers.B0C, registers.B1C, registers.B2C, registers.B3C, gColor, registers.BMM, registers.ECM, registers.MCM);
 
-            var muxOutput = mux.OutputColor(spriteDatas, spriteColors, spritePriorities, graphicsDataOutput, graphicsColorOutput);
-            var borderOutput = border.MuxBorderUnit(muxOutput, registers.EC);
+            var muxOutput = Vic2Mux.OutputColor(spriteDatas, spriteColors, spritePriorities, graphicsDataOutput, graphicsColorOutput);
+            var borderOutput = Vic2BorderUnit.OutputColor(registers.MainBorderFlipFlop, registers.VerticalBorderFlipFlop, muxOutput, registers.EC);
 
             var f = Expression.Lambda<Func<int, int>>(borderOutput, gColor).Compile();
             f(0);

@@ -8,6 +8,21 @@ namespace Breadbox.Extensions
 {
     internal static class Util
     {
+        public static Expression Set(MemberExpression expression)
+        {
+            return Expression.Assign(expression, Expression.Constant(true));
+        }
+
+        public static Expression Reset(MemberExpression expression)
+        {
+            return Expression.Assign(expression, Expression.Constant(false));
+        }
+
+        public static Expression Invert(MemberExpression expression)
+        {
+            return Expression.Assign(expression, Expression.Not(expression));
+        }
+
         public static MemberExpression Member<TProperty>(Expression<Func<TProperty>> propertyLambda)
         {
             return propertyLambda.Body as MemberExpression;
