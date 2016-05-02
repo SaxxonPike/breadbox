@@ -7,6 +7,8 @@ namespace Breadbox.Chips.Vic2
 {
     public class Vic2State
     {
+        private bool _badLine;
+        private bool _badLineEnable;
         private bool _mainBorderFlipFlop;
         private bool _verticalBorderFlipFlop;
         private int _graphicsBuffer;
@@ -172,6 +174,8 @@ namespace Breadbox.Chips.Vic2
         private bool _aec;
         private bool _lp;
         private int _address;
+        private int _rasterX;
+        private int _rasterY;
 
         public IndexExpression VideoMemory(Expression index)
         {
@@ -181,6 +185,16 @@ namespace Breadbox.Chips.Vic2
         public MemberExpression Address
         {
             get { return Util.Member(() => _address); }
+        }
+
+        public MemberExpression RasterX
+        {
+            get { return Util.Member(() => _rasterX); }
+        }
+
+        public MemberExpression RasterY
+        {
+            get { return Util.Member(() => _rasterY); }
         }
 
         public MemberExpression BA
@@ -563,5 +577,14 @@ namespace Breadbox.Chips.Vic2
             get { return Util.Member(() => _ref); }
         }
 
+        public MemberExpression BadLine
+        {
+            get { return Util.Member(() => _badLine); }
+        }
+
+        public MemberExpression BadLineEnable
+        {
+            get { return Util.Member(() => _badLineEnable); }
+        }
     }
 }
