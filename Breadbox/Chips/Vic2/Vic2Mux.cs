@@ -38,7 +38,7 @@ namespace Breadbox.Chips.Vic2
                 Expression.Constant(0x00));
         }
 
-        public static Expression OutputColor(IList<Expression> spriteDatas, IList<Expression> spriteColors, IList<Expression> spritePriorities, Expression graphicsData,
+        public static Expression OutputColor(IList<Expression> spriteDatas, IList<Expression> spriteColors, IList<MemberExpression> spritePriorities, Expression graphicsData,
             Expression graphicsColor)
         {
             var cachedGraphicsData = Expression.Variable(typeof(int));

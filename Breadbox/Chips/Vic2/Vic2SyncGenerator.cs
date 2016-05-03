@@ -16,5 +16,10 @@ namespace Breadbox.Chips.Vic2
                     Expression.IfThen(Expression.Equal(y, vsyncClearY),
                         Util.Reset(vsync))));
         }
+
+        public static Expression IsBlanked(Expression hsync, Expression vsync)
+        {
+            return Expression.OrElse(hsync, vsync);
+        }
     }
 }

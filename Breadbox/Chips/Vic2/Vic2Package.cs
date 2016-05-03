@@ -10,6 +10,86 @@ namespace Breadbox.Chips.Vic2
     public class Vic2Package
     {
         private readonly Vic2State _state = new Vic2State();
+        private readonly ConstantExpression _width;
+        private readonly ConstantExpression _lines;
+        private readonly ConstantExpression _sprite0BaX;
+
+        public Vic2Package(int width, int lines, int sprite0BaX)
+        {
+            _width = Expression.Constant(width);
+            _lines = Expression.Constant(lines);
+            _sprite0BaX = Expression.Constant(sprite0BaX);
+        }
+
+        public Expression Clock(Expression addressBus, Expression dataBus, Expression readBus)
+        {
+            var clock = Vic2ClockGenerator.Clock(_state.RasterX, _state.RasterY, _width, _lines, _state.BadLineEnable,
+                _state.BadLine, _state.DEN, _state.YSCROLL, _state.BA, _state.AEC, _state.BaCounter, _state.FetchCounter,
+                _sprite0BaX, _state.Address, _state.MobDma, _state.VM, _state.MobPointer, _state.Mc, _state.BMM, _state.ECM,
+                _state.IdleState, _state.CB, _state.VC, _state.RC, _state.VideoMemory, _state.REF, _state.VMLI, _state.VCBASE);
+
+            var borderClock = Vic2BorderUnit.Clock(_state.MainBorderFlipFlop, _state.VerticalBorderFlipFlop,
+                _state.RasterX, _state.RasterY, _state.CSEL, _state.RSEL,
+                Expression.Constant((int) _sprite0BaX.Value + 40), _state.DEN);
+
+            return Expression.Block(
+                clock,
+                borderClock,
+                Expression.Assign(_state.PixelOutput, Render)
+                );
+        }
+
+        private Expression Render
+        {
+            get
+            {
+                var blanked = Vic2SyncGenerator.IsBlanked(_state.HSYNC, _state.VSYNC);
+                var graphicsOutputColor = Vic2GraphicsDataSequencer.OutputColor(_state.GraphicsBuffer, _state.B0C,
+                    _state.B1C, _state.B2C, _state.B3C, _state.BufferCData, _state.BMM, _state.ECM, _state.MCM);
+                var graphicsOutputData = Vic2GraphicsDataSequencer.OutputData(_state.GraphicsBuffer, _state.BMM,
+                    _state.MCM, _state.BufferCData);
+                var spriteOutputDatas = new[]
+                {
+                    Vic2MobDataSequencer.OutputData(_state.MobBuffer0, _state.M0MC),
+                    Vic2MobDataSequencer.OutputData(_state.MobBuffer1, _state.M1MC),
+                    Vic2MobDataSequencer.OutputData(_state.MobBuffer2, _state.M2MC),
+                    Vic2MobDataSequencer.OutputData(_state.MobBuffer3, _state.M3MC),
+                    Vic2MobDataSequencer.OutputData(_state.MobBuffer4, _state.M4MC),
+                    Vic2MobDataSequencer.OutputData(_state.MobBuffer5, _state.M5MC),
+                    Vic2MobDataSequencer.OutputData(_state.MobBuffer6, _state.M6MC),
+                    Vic2MobDataSequencer.OutputData(_state.MobBuffer7, _state.M7MC)
+                };
+                var spriteOutputColors = new[]
+                {
+                    Vic2MobDataSequencer.OutputColor(_state.MobBuffer0, _state.M0MC, _state.M0C, _state.MM0, _state.MM1),
+                    Vic2MobDataSequencer.OutputColor(_state.MobBuffer1, _state.M1MC, _state.M1C, _state.MM0, _state.MM1),
+                    Vic2MobDataSequencer.OutputColor(_state.MobBuffer2, _state.M2MC, _state.M2C, _state.MM0, _state.MM1),
+                    Vic2MobDataSequencer.OutputColor(_state.MobBuffer3, _state.M3MC, _state.M3C, _state.MM0, _state.MM1),
+                    Vic2MobDataSequencer.OutputColor(_state.MobBuffer4, _state.M4MC, _state.M4C, _state.MM0, _state.MM1),
+                    Vic2MobDataSequencer.OutputColor(_state.MobBuffer5, _state.M5MC, _state.M5C, _state.MM0, _state.MM1),
+                    Vic2MobDataSequencer.OutputColor(_state.MobBuffer6, _state.M6MC, _state.M6C, _state.MM0, _state.MM1),
+                    Vic2MobDataSequencer.OutputColor(_state.MobBuffer7, _state.M7MC, _state.M7C, _state.MM0, _state.MM1),
+                };
+
+                var muxOutput = Vic2Mux.OutputColor(spriteOutputDatas, spriteOutputColors, _state.MobPriority, graphicsOutputData, graphicsOutputColor);
+                var borderOutput = Vic2BorderUnit.OutputColor(_state.MainBorderFlipFlop, _state.VerticalBorderFlipFlop, muxOutput, _state.EC);
+
+                return Expression.Condition(blanked, Expression.Constant(0), borderOutput);
+            }
+        }
+
+        public Expression OutputVideo
+        {
+            get
+            {
+                return _state.PixelOutput;
+            }
+        }
+
+        public Expression Address
+        {
+            get { return _state.Address; }
+        }
 
         public Expression Irq
         {

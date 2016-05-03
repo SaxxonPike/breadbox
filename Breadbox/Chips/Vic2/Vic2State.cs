@@ -1,4 +1,5 @@
-﻿using System.Linq.Expressions;
+﻿using System.Collections.Generic;
+using System.Linq.Expressions;
 using Breadbox.Extensions;
 
 #pragma warning disable 649
@@ -7,6 +8,15 @@ namespace Breadbox.Chips.Vic2
 {
     public class Vic2State
     {
+        public Vic2State()
+        {
+            Reset();
+        }
+
+        private int _pixelOutput;
+        private bool _idleState;
+        private int _fetchCounter;
+        private int _baCounter;
         private bool _badLine;
         private bool _badLineEnable;
         private bool _mainBorderFlipFlop;
@@ -37,6 +47,22 @@ namespace Breadbox.Chips.Vic2
         private int _mobBuffer5;
         private int _mobBuffer6;
         private int _mobBuffer7;
+        private bool _mobDma0;
+        private bool _mobDma1;
+        private bool _mobDma2;
+        private bool _mobDma3;
+        private bool _mobDma4;
+        private bool _mobDma5;
+        private bool _mobDma6;
+        private bool _mobDma7;
+        private int _mobPointer0;
+        private int _mobPointer1;
+        private int _mobPointer2;
+        private int _mobPointer3;
+        private int _mobPointer4;
+        private int _mobPointer5;
+        private int _mobPointer6;
+        private int _mobPointer7;
         private bool _mobMultiColorFlipFlop0;
         private bool _mobMultiColorFlipFlop1;
         private bool _mobMultiColorFlipFlop2;
@@ -164,8 +190,8 @@ namespace Breadbox.Chips.Vic2
         private int _m7c;
         private int _ref;
         private int _rc;
-        private int _hsync;
-        private int _vsync;
+        private bool _hsync;
+        private bool _vsync;
         private int _vc;
         private int _vcBase;
         private int _vmli;
@@ -176,6 +202,18 @@ namespace Breadbox.Chips.Vic2
         private int _address;
         private int _rasterX;
         private int _rasterY;
+        private int _bufferCData;
+        private int _bufferGData;
+
+        public void Reset()
+        {
+            _fetchCounter = -512;
+            _baCounter = 7;
+            _rasterX = -1;
+            _rasterY = 0;
+            _hsync = true;
+            _vsync = true;
+        }
 
         public IndexExpression VideoMemory(Expression index)
         {
@@ -586,5 +624,146 @@ namespace Breadbox.Chips.Vic2
         {
             get { return Util.Member(() => _badLineEnable); }
         }
+
+        public MemberExpression BaCounter
+        {
+            get { return Util.Member(() => _baCounter); }
+        }
+
+        public MemberExpression MobDma0
+        {
+            get { return Util.Member(() => _mobDma0); }
+        }
+
+        public MemberExpression MobDma1
+        {
+            get { return Util.Member(() => _mobDma1); }
+        }
+
+        public MemberExpression MobDma2
+        {
+            get { return Util.Member(() => _mobDma2); }
+        }
+
+        public MemberExpression MobDma3
+        {
+            get { return Util.Member(() => _mobDma3); }
+        }
+
+        public MemberExpression MobDma4
+        {
+            get { return Util.Member(() => _mobDma4); }
+        }
+
+        public MemberExpression MobDma5
+        {
+            get { return Util.Member(() => _mobDma5); }
+        }
+
+        public MemberExpression MobDma6
+        {
+            get { return Util.Member(() => _mobDma6); }
+        }
+
+        public MemberExpression MobDma7
+        {
+            get { return Util.Member(() => _mobDma7); }
+        }
+
+        public IList<MemberExpression> MobDma
+        {
+            get { return new[] {MobDma0, MobDma1, MobDma2, MobDma3, MobDma4, MobDma5, MobDma6, MobDma7}; }
+        }
+
+        public MemberExpression MobPointer0
+        {
+            get { return Util.Member(() => _mobPointer0); }
+        }
+
+        public MemberExpression MobPointer1
+        {
+            get { return Util.Member(() => _mobPointer1); }
+        }
+
+        public MemberExpression MobPointer2
+        {
+            get { return Util.Member(() => _mobPointer2); }
+        }
+
+        public MemberExpression MobPointer3
+        {
+            get { return Util.Member(() => _mobPointer3); }
+        }
+
+        public MemberExpression MobPointer4
+        {
+            get { return Util.Member(() => _mobPointer4); }
+        }
+
+        public MemberExpression MobPointer5
+        {
+            get { return Util.Member(() => _mobPointer5); }
+        }
+
+        public MemberExpression MobPointer6
+        {
+            get { return Util.Member(() => _mobPointer6); }
+        }
+
+        public MemberExpression MobPointer7
+        {
+            get { return Util.Member(() => _mobPointer7); }
+        }
+
+        public IList<MemberExpression> MobPointer
+        {
+            get { return new[] { MobPointer0, MobPointer1, MobPointer2, MobPointer3, MobPointer4, MobPointer5, MobPointer6, MobPointer7 }; }
+        }
+
+        public MemberExpression FetchCounter
+        {
+            get { return Util.Member(() => _fetchCounter); }
+        }
+
+        public MemberExpression IdleState
+        {
+            get { return Util.Member(() => _idleState); }
+        }
+
+        public IList<MemberExpression> Mc
+        {
+            get { return new[] {Mc0, Mc1, Mc2, Mc3, Mc4, Mc5, Mc6, Mc7}; }
+        }
+
+        public MemberExpression BufferCData
+        {
+            get { return Util.Member(() => _bufferCData); }
+        }
+
+        public MemberExpression BufferGData
+        {
+            get { return Util.Member(() => _bufferGData); }
+        }
+
+        public IList<MemberExpression> MobBuffer
+        {
+            get { return new[] { MobBuffer0, MobBuffer1, MobBuffer2, MobBuffer3, MobBuffer4, MobBuffer5, MobBuffer6, MobBuffer7 }; }
+        }
+
+        public IList<MemberExpression> MobColor
+        {
+            get { return new[] { M0C, M1C, M2C, M3C, M4C, M5C, M6C, M7C }; }
+        }
+
+        public IList<MemberExpression> MobPriority
+        {
+            get { return new[] { M0DP, M1DP, M2DP, M3DP, M4DP, M5DP, M6DP, M7DP }; }
+        }
+
+        public MemberExpression PixelOutput
+        {
+            get { return Util.Member(() => _pixelOutput); }
+        }
     }
 }
+
