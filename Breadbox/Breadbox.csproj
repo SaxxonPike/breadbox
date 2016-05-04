@@ -40,42 +40,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Builders\BusBuilder.cs" />
-    <Compile Include="Builders\CellBuilder.cs" />
-    <Compile Include="Builders\MemoryBuilder.cs" />
-    <Compile Include="Chips\Vic2\Vic2AecSignal.cs" />
-    <Compile Include="Chips\Vic2\Vic2BorderUnit.cs" />
-    <Compile Include="Chips\Vic2\Vic2ClockGenerator.cs" />
-    <Compile Include="Chips\Vic2\Vic2AddressGenerator.cs" />
-    <Compile Include="Chips\Vic2\Vic2GraphicsAddressGenerator.cs" />
-    <Compile Include="Chips\Vic2\Vic2GraphicsDataSequencer.cs" />
-    <Compile Include="Chips\Vic2\Vic2MobCounter.cs" />
-    <Compile Include="Chips\Vic2\Vic2MobDataSequencer.cs" />
-    <Compile Include="Chips\Vic2\Vic2Mux.cs" />
-    <Compile Include="Chips\Vic2\Vic2Package.cs" />
-    <Compile Include="Chips\Vic2\Vic2RasterCounter.cs" />
-    <Compile Include="Chips\Vic2\Vic2RefreshAddressGenerator.cs" />
-    <Compile Include="Chips\Vic2\Vic2RowCounter.cs" />
-    <Compile Include="Chips\Vic2\Vic2SpriteAddressGenerator.cs" />
-    <Compile Include="Chips\Vic2\Vic2State.cs" />
-    <Compile Include="Chips\Vic2\Vic2SyncGenerator.cs" />
-    <Compile Include="Chips\Vic2\Vic2VideoMatrixCounter.cs" />
-    <Compile Include="Chips\Vic2\Vic2VideoOutput.cs" />
-    <Compile Include="Extensions\ExpressionExtensions.cs" />
-    <Compile Include="Extensions\ReadWriteableExtensions.cs" />
-    <Compile Include="Extensions\Util.cs" />
-    <Compile Include="Interfaces\IBus.cs" />
-    <Compile Include="Interfaces\IReadable.cs" />
-    <Compile Include="Interfaces\IReadableAddressable.cs" />
-    <Compile Include="Interfaces\IReadWriteable.cs" />
-    <Compile Include="Interfaces\IReadWriteableAddressable.cs" />
-    <Compile Include="Interfaces\IWriteable.cs" />
-    <Compile Include="Interfaces\IWriteableAddressable.cs" />
+    <Compile Include="Packages\Mos6567R56A.cs" />
+    <Compile Include="Packages\Mos6567R8.cs" />
+    <Compile Include="Packages\Mos6569.cs" />
+    <Compile Include="Packages\Vic2\AddressGenerator.cs" />
+    <Compile Include="Packages\Vic2\Config.cs" />
+    <Compile Include="Packages\Vic2\Package.cs" />
+    <Compile Include="Packages\Vic2\RasterCounter.cs" />
+    <Compile Include="Packages\Vic2\State.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Util.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Chips\Cpu6502\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

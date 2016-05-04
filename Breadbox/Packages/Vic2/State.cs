@@ -177,6 +177,36 @@ namespace Breadbox.Packages.Vic2
         private int _D37;
         private int _D38;
         private int _D39;
+        private bool _HBLANK;
+        private bool _VBLANK;
+        private int _MAC;
+        private int _VMLI;
+        private int _MP0;
+        private int _MP1;
+        private int _MP2;
+        private int _MP3;
+        private int _MP4;
+        private int _MP5;
+        private int _MP6;
+        private int _MP7;
+        private bool _IDLE;
+        private int _MD0;
+        private int _MD1;
+        private int _MD2;
+        private int _MD3;
+        private int _MD4;
+        private int _MD5;
+        private int _MD6;
+        private int _MD7;
+        private int _GD;
+        private int _REF;
+        private int _RASTERX;
+        private int _RASTERXC;
+
+        public void Reset()
+        {
+            _MAC = int.MinValue;
+        }
 
         public IList<Expression> MnX
         {
@@ -597,6 +627,118 @@ namespace Breadbox.Packages.Vic2
         public Expression RC
         {
             get { return Util.Member(() => _RC); }
+        }
+
+        public Expression HBLANK
+        {
+            get { return Util.Member(() => _HBLANK); }
+        }
+
+        public Expression VBLANK
+        {
+            get { return Util.Member(() => _VBLANK); }
+        }
+
+        public Expression MAC
+        {
+            get { return Util.Member(() => _MAC); }
+        }
+
+        public Expression VC
+        {
+            get { return Util.Member(() => _VC); }
+        }
+
+        public Expression VCBASE
+        {
+            get { return Util.Member(() => _VCBASE); }
+        }
+
+        public Expression VMLI
+        {
+            get { return Util.Member(() => _VMLI); }
+        }
+
+        /// <summary>
+        /// Mob data pointers.
+        /// </summary>
+        public IList<Expression> MPn
+        {
+            get
+            {
+                return new Expression[]
+                {
+                    Util.Member(() => _MP0),
+                    Util.Member(() => _MP1),
+                    Util.Member(() => _MP2),
+                    Util.Member(() => _MP3),
+                    Util.Member(() => _MP4),
+                    Util.Member(() => _MP5),
+                    Util.Member(() => _MP6),
+                    Util.Member(() => _MP7)
+                };
+            }
+        }
+
+        /// <summary>
+        /// Mob data buffers.
+        /// </summary>
+        public IList<Expression> MDn
+        {
+            get
+            {
+                return new Expression[]
+                {
+                    Util.Member(() => _MD0),
+                    Util.Member(() => _MD1),
+                    Util.Member(() => _MD2),
+                    Util.Member(() => _MD3),
+                    Util.Member(() => _MD4),
+                    Util.Member(() => _MD5),
+                    Util.Member(() => _MD6),
+                    Util.Member(() => _MD7)
+                };
+            }
+        }
+
+        /// <summary>
+        /// Idle state.
+        /// </summary>
+        public Expression IDLE
+        {
+            get { return Util.Member(() => _IDLE); }
+        }
+
+        /// <summary>
+        /// Graphics shift register data.
+        /// </summary>
+        public Expression GD
+        {
+            get { return Util.Member(() => _GD); }
+        }
+
+        /// <summary>
+        /// Refresh counter.
+        /// </summary>
+        public Expression REF
+        {
+            get { return Util.Member(() => _REF); }
+        }
+
+        /// <summary>
+        /// The "visible" raster X counter (pauses in new NTSC for 8 clocks)
+        /// </summary>
+        public Expression RASTERX
+        {
+            get { return Util.Member(() => _RASTERX); }
+        }
+
+        /// <summary>
+        /// Actual raster X counter.
+        /// </summary>
+        public Expression RASTERXC
+        {
+            get { return Util.Member(() => _RASTERXC); }
         }
     }
 }
