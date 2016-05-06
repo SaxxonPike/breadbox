@@ -202,6 +202,24 @@ namespace Breadbox.Packages.Vic2
         private int _REF;
         private int _RASTERX;
         private int _RASTERXC;
+        private bool _GDMC;
+        private int _COLORBUFFER;
+        private bool _MXMC0;
+        private bool _MXMC1;
+        private bool _MXMC2;
+        private bool _MXMC3;
+        private bool _MXMC4;
+        private bool _MXMC5;
+        private bool _MXMC6;
+        private bool _MXMC7;
+        private bool _MSRE0;
+        private bool _MSRE1;
+        private bool _MSRE2;
+        private bool _MSRE3;
+        private bool _MSRE4;
+        private bool _MSRE5;
+        private bool _MSRE6;
+        private bool _MSRE7;
 
         public void Reset()
         {
@@ -739,6 +757,64 @@ namespace Breadbox.Packages.Vic2
         public Expression RASTERXC
         {
             get { return Util.Member(() => _RASTERXC); }
+        }
+
+        /// <summary>
+        /// Graphics data output multicolor flipflop.
+        /// </summary>
+        public Expression GDMC
+        {
+            get { return Util.Member(() => _GDMC); }
+        }
+
+        /// <summary>
+        /// Last accessed C data.
+        /// </summary>
+        public Expression CBUFFER
+        {
+            get { return Util.Member(() => _COLORBUFFER); }
+        }
+
+        /// <summary>
+        /// Mob x-expansion flipflop.
+        /// </summary>
+        public IList<Expression> MXMCn
+        {
+            get
+            {
+                return new Expression[]
+                {
+                    Util.Member(() => _MXMC0),
+                    Util.Member(() => _MXMC1),
+                    Util.Member(() => _MXMC2),
+                    Util.Member(() => _MXMC3),
+                    Util.Member(() => _MXMC4),
+                    Util.Member(() => _MXMC5),
+                    Util.Member(() => _MXMC6),
+                    Util.Member(() => _MXMC7)
+                };
+            }
+        }
+
+        /// <summary>
+        /// Mob shift register enable.
+        /// </summary>
+        public IList<Expression> MSREn
+        {
+            get
+            {
+                return new Expression[]
+                {
+                    Util.Member(() => _MSRE0),
+                    Util.Member(() => _MSRE1),
+                    Util.Member(() => _MSRE2),
+                    Util.Member(() => _MSRE3),
+                    Util.Member(() => _MSRE4),
+                    Util.Member(() => _MSRE5),
+                    Util.Member(() => _MSRE6),
+                    Util.Member(() => _MSRE7)
+                };
+            }
         }
     }
 }

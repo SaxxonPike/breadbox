@@ -8,6 +8,19 @@ namespace Breadbox
 {
     public static class Util
     {
+        public static Expression Void(params Expression[] expressions)
+        {
+            if (expressions.Length == 0)
+            {
+                return Expression.Empty();
+            }
+            if (expressions.Last().Type != typeof(void))
+            {
+                return Expression.Block(expressions.Concat(new[] { Expression.Empty() }).ToArray());
+            }
+            return Expression.Block(expressions);
+        }
+
         public static IndexExpression ArrayMember<TItem>(Expression<Func<TItem[]>> arrayLambda, Expression index)
         {
             return Expression.ArrayAccess(arrayLambda.Body, index);
@@ -22,12 +35,10 @@ namespace Breadbox
             Expression value)
         {
             var enumerable = expressions as Expression[] ?? expressions.ToArray();
-            var cases = enumerable.Select((e, i) => Expression.SwitchCase(e, Expression.Constant(i))).ToArray();
             var temp = Expression.Variable(enumerable.First().Type);
             return Expression.Block(new[] { temp },
                 Expression.Assign(temp, value),
-                SelectUsing(enumerable.Select(e => Expression.Assign(e, temp)), selector),
-                Expression.Empty()
+                SelectUsing(enumerable.Select(e => Expression.Assign(e, temp)), selector)
                 );
         }
 

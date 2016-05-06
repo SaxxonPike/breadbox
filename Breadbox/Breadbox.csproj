@@ -43,10 +43,16 @@
     <Compile Include="Packages\Mos6567R56A.cs" />
     <Compile Include="Packages\Mos6567R8.cs" />
     <Compile Include="Packages\Mos6569.cs" />
+    <Compile Include="Packages\Ram1x4.cs" />
+    <Compile Include="Packages\Ram64x8.cs" />
+    <Compile Include="Packages\Memory\Package.cs" />
     <Compile Include="Packages\Vic2\AddressGenerator.cs" />
     <Compile Include="Packages\Vic2\Config.cs" />
+    <Compile Include="Packages\Vic2\GraphicsGenerator.cs" />
+    <Compile Include="Packages\Vic2\Mux.cs" />
     <Compile Include="Packages\Vic2\Package.cs" />
     <Compile Include="Packages\Vic2\RasterCounter.cs" />
+    <Compile Include="Packages\Vic2\SpriteGenerator.cs" />
     <Compile Include="Packages\Vic2\State.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Util.cs" />
