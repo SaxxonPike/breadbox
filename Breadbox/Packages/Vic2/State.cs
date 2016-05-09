@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+// ReSharper disable InconsistentNaming
+#pragma warning disable 0649
 
 namespace Breadbox.Packages.Vic2
 {
@@ -221,9 +223,16 @@ namespace Breadbox.Packages.Vic2
         private bool _MSRE6;
         private bool _MSRE7;
 
+        public State()
+        {
+            Reset();
+        }
+
         public void Reset()
         {
             _MAC = int.MinValue;
+            _VBLANK = true;
+            _HBLANK = true;
         }
 
         public IList<Expression> MnX

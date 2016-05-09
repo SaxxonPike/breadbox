@@ -11,19 +11,17 @@ namespace Breadbox.Packages.Vic2
         private readonly Config _config;
         private readonly State _state = new State();
         private readonly AddressGenerator _addressGenerator;
-        private readonly GraphicsGenerator _graphicsGenerator;
         private readonly RasterCounter _rasterCounter;
-        private readonly SpriteGenerator _spriteGenerator;
         private readonly Mux _mux;
+        private readonly VideoBuffer _videoBuffer;
 
         protected Package(Config config)
         {
             _config = config;
             _addressGenerator = new AddressGenerator(_state, _config);
-            _graphicsGenerator = new GraphicsGenerator(_state, _config);
             _rasterCounter = new RasterCounter(_state, _config);
-            _spriteGenerator = new SpriteGenerator(_state, _config);
             _mux = new Mux(_state, _config);
+            _videoBuffer = new VideoBuffer(_state.HBLANK, _state.VBLANK, _config.VideoWidth, _config.VideoHeight);
         }
 
         public Expression Clock(Func<Expression, Expression> readMemory, Func<Expression, Expression> readColorMemory, Expression clockPhi1, Expression clockPhi2)
@@ -31,24 +29,15 @@ namespace Breadbox.Packages.Vic2
             var clock2mhz = Util.Void(
                 _addressGenerator.Clock(readMemory, readColorMemory)
                 );
-            var clock8mhz = Util.Void(
-                _graphicsGenerator.Clock,
-                _spriteGenerator.Clock(0),
-                _spriteGenerator.Clock(1),
-                _spriteGenerator.Clock(2),
-                _spriteGenerator.Clock(3),
-                _spriteGenerator.Clock(4),
-                _spriteGenerator.Clock(5),
-                _spriteGenerator.Clock(6),
-                _spriteGenerator.Clock(7)
-                );
 
-            return _rasterCounter.Clock(clock8mhz, clock2mhz, clockPhi1, clockPhi2);
+            return _rasterCounter.Clock(clock2mhz, clockPhi1, clockPhi2, _videoBuffer.Write(_mux.OutputColor));
         }
 
-        public Expression OutputPixel
+        public Expression Frame(Func<Expression, Expression> readMemory, Func<Expression, Expression> readColorMemory,
+            Expression clockPhi1, Expression clockPhi2)
         {
-            get { return _mux.OutputColor; }
+            return Util.Repeat(_config.ClocksPerRasterValue*_config.RastersPerFrameValue,
+                Clock(readMemory, readColorMemory, clockPhi1, clockPhi2));
         }
     }
 }

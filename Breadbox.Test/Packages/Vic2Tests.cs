@@ -18,58 +18,20 @@ namespace Breadbox.Test.Packages
             var vic2 = new Mos6567R8();
             var colorRam = new Ram1x4();
             var systemRam = new Ram64x8();
-
-            var clock = vic2.Clock(systemRam.Read, colorRam.Read, null, null);
-            var clockFunc = Expression.Lambda<Action>(clock).Compile();
-            var pixel = vic2.OutputPixel;
-            var pixelFunc = Expression.Lambda<Func<int>>(pixel).Compile();
-
-            var procsPerSecond = 520*263*60;
+            var frame = vic2.Frame(systemRam.Read, colorRam.Read, null, null);
+            var framesPerSecond = 60;
             var sw = new Stopwatch();
 
-            clockFunc();
+            var frameFunc = Expression.Lambda<Action>(frame).Compile();
+            frameFunc();
             sw.Start();
-            for (var i = 0; i < procsPerSecond; i++)
+            for (var i = 0; i < framesPerSecond; i++)
             {
-                clockFunc();
+                frameFunc();
             }
             sw.Stop();
             Console.WriteLine(sw.ElapsedMilliseconds);
             sw.Reset();
-
-            pixelFunc();
-            sw.Start();
-            for (var i = 0; i < procsPerSecond; i++)
-            {
-                pixelFunc();
-            }
-            sw.Stop();
-            Console.WriteLine(sw.ElapsedMilliseconds);
-            sw.Reset();
-
-            sw.Start();
-            for (var i = 0; i < procsPerSecond; i++)
-            {
-                clockFunc();
-                pixelFunc();
-            }
-            sw.Stop();
-            Console.WriteLine(sw.ElapsedMilliseconds);
-            sw.Reset();
-
-            var combined = Expression.Block(clock, pixel);
-            var combinedFunc = Expression.Lambda<Func<int>>(combined).Compile();
-            combinedFunc();
-            sw.Start();
-            for (var i = 0; i < procsPerSecond; i++)
-            {
-                combinedFunc();
-            }
-            sw.Stop();
-            Console.WriteLine(sw.ElapsedMilliseconds);
-            sw.Reset();
-
-
         }
     }
 }

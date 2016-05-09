@@ -8,6 +8,40 @@ namespace Breadbox
 {
     public static class Util
     {
+        public static Expression Repeat(int times, params Expression[] expressions)
+        {
+            if (expressions.Length < 1)
+            {
+                return Expression.Empty();
+            }
+
+            var loopBlock = new List<Expression>();
+            var block = new List<Expression>();
+            var counter = Expression.Variable(typeof(int));
+            var endLoopLabel = Expression.Label(typeof(void));
+            var loopBlockVariables = new List<ParameterExpression>();
+            loopBlock.Add(Expression.IfThen(Expression.Equal(Expression.Constant(0), Expression.PostDecrementAssign(counter)), Expression.Break(endLoopLabel)));
+
+            if (expressions.All(e => e is BlockExpression))
+            {
+                loopBlock.AddRange(expressions.Cast<BlockExpression>().SelectMany(e => e.Expressions));
+                loopBlockVariables.AddRange(expressions.Cast<BlockExpression>().SelectMany(e => e.Variables));
+            }
+            else
+            {
+                loopBlock.AddRange(expressions);
+            }
+
+            var innerBlockExpression = loopBlockVariables.Count > 0
+                ? Expression.Block(loopBlockVariables, loopBlock)
+                : Void(loopBlock.ToArray());
+
+            block.Add(Expression.Assign(counter, Expression.Constant(times)));
+            block.Add(Expression.Loop(innerBlockExpression, endLoopLabel));
+
+            return Expression.Block(new[] { counter }, block);
+        }
+
         public static Expression Void(params Expression[] expressions)
         {
             if (expressions.Length == 0)
@@ -16,9 +50,9 @@ namespace Breadbox
             }
             if (expressions.Last().Type != typeof(void))
             {
-                return Expression.Block(expressions.Concat(new[] { Expression.Empty() }).ToArray());
+                return Expression.Block(new ParameterExpression[0], expressions.Concat(new[] { Expression.Empty() }).ToArray());
             }
-            return Expression.Block(expressions);
+            return Expression.Block(new ParameterExpression[0], expressions);
         }
 
         public static IndexExpression ArrayMember<TItem>(Expression<Func<TItem[]>> arrayLambda, Expression index)

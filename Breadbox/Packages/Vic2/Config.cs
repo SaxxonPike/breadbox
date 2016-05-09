@@ -39,6 +39,7 @@ namespace Breadbox.Packages.Vic2
         }
 
         public int ClocksPerRasterValue { get { return _clocksPerRaster; } }
+        public int RastersPerFrameValue { get { return _rastersPerFrame; } }
         public int HBlankSetXValue { get { return _hBlankSetX; } }
 
         public Expression ClocksPerRaster { get { return Expression.Constant(_clocksPerRaster);} }
@@ -49,5 +50,39 @@ namespace Breadbox.Packages.Vic2
         public Expression VBlankClearY { get { return Expression.Constant(_vBlankClearY); } }
         public Expression FetchSprite0BaX { get { return Expression.Constant(_fetchSprite0BaX); } }
         public Expression RasterStartX { get { return Expression.Constant(_rasterStartX); } }
+
+        public int VideoWidth
+        {
+            get
+            {
+                var hBlankStart = _hBlankSetX;
+                var hBlankEnd = _hBlankClearX;
+
+                if (hBlankEnd < hBlankStart)
+                {
+                    hBlankEnd += _clocksPerRaster;
+                }
+
+                var blankedPixels = hBlankEnd - hBlankStart;
+                return _clocksPerRaster - blankedPixels;
+            }
+        }
+
+        public int VideoHeight
+        {
+            get
+            {
+                var vBlankStart = _vBlankSetY;
+                var vBlankEnd = _vBlankClearY;
+
+                if (vBlankEnd < vBlankStart)
+                {
+                    vBlankEnd += _rastersPerFrame;
+                }
+
+                var blankedRasters = vBlankEnd - vBlankStart;
+                return _rastersPerFrame - blankedRasters;
+            }
+        }
     }
 }
