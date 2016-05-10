@@ -48,11 +48,37 @@ namespace Breadbox
             {
                 return Expression.Empty();
             }
+            if (expressions.Length == 1 && expressions.First().Type == typeof(void))
+            {
+                return expressions.First();
+            }
+            if (expressions.All(e => e is BlockExpression))
+            {
+                var mainBlock = new List<Expression>();
+                var mainBlockVariables = new List<ParameterExpression>();
+                mainBlock.AddRange(expressions.Cast<BlockExpression>().SelectMany(e => e.Expressions));
+                mainBlockVariables.AddRange(expressions.Cast<BlockExpression>().SelectMany(e => e.Variables));
+                if (mainBlock.Last().Type != typeof(void))
+                {
+                    mainBlock.Add(Expression.Empty());
+                }
+                return Expression.Block(mainBlockVariables, mainBlock);
+            }
             if (expressions.Last().Type != typeof(void))
             {
                 return Expression.Block(new ParameterExpression[0], expressions.Concat(new[] { Expression.Empty() }).ToArray());
             }
             return Expression.Block(new ParameterExpression[0], expressions);
+        }
+
+        public static Expression Action(Expression<Action> actionLambda)
+        {
+            return actionLambda.Body;
+        }
+
+        public static Expression Func<TResult>(Expression<Func<TResult>> functionLambda)
+        {
+            return functionLambda.Body;
         }
 
         public static IndexExpression ArrayMember<TItem>(Expression<Func<TItem[]>> arrayLambda, Expression index)

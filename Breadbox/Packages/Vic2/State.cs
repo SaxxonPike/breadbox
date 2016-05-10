@@ -222,6 +222,9 @@ namespace Breadbox.Packages.Vic2
         private bool _MSRE5;
         private bool _MSRE6;
         private bool _MSRE7;
+        private bool _ADDRESS;
+        private bool _BADLINE;
+        private bool _BADLINEENABLE;
 
         public State()
         {
@@ -233,6 +236,27 @@ namespace Breadbox.Packages.Vic2
             _MAC = int.MinValue;
             _VBLANK = true;
             _HBLANK = true;
+        }
+
+        public Expression ADDRESS
+        {
+            get { return Util.Member(() => _ADDRESS); }
+        }
+
+        /// <summary>
+        /// Badline condition.
+        /// </summary>
+        public Expression BADLINE
+        {
+            get { return Util.Member(() => _BADLINE); }
+        }
+
+        /// <summary>
+        /// Enable badline condition.
+        /// </summary>
+        public Expression BADLINEENABLE
+        {
+            get { return Util.Member(() => _BADLINEENABLE); }
         }
 
         public IList<Expression> MnX

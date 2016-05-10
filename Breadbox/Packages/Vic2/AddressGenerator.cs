@@ -68,6 +68,29 @@ namespace Breadbox.Packages.Vic2
             _config = config;
         }
 
+        public Expression UpdateBadlineEnable
+        {
+            get
+            {
+                return Expression.Switch(_state.RASTER,
+                    Expression.SwitchCase(Util.Void(Expression.Assign(_state.BADLINEENABLE, Expression.OrElse(_state.BADLINE, _state.DEN))), Expression.Constant(0x030)),
+                    Expression.SwitchCase(Util.Void(Expression.Assign(_state.BADLINE, Expression.Assign(_state.BADLINEENABLE, Expression.Constant(false)))), Expression.Constant(0x0F8)));
+            }
+        }
+
+        public Expression UpdateBadline
+        {
+            get
+            {
+                var rastery = _state.RASTER;
+                return Expression.IfThen(Util.And(_state.BADLINEENABLE,
+                    Expression.GreaterThanOrEqual(rastery, Expression.Constant(0x30)),
+                    Expression.LessThanOrEqual(rastery, Expression.Constant(0xF7)),
+                    Expression.Equal(Expression.And(Expression.Constant(0x7), rastery), _state.YSCROLL)),
+                    Expression.Assign(_state.BADLINE, Expression.Constant(true)));
+            }
+        }
+
         public Expression Clock(Func<Expression, Expression> readData, Func<Expression, Expression> readColorMemory)
         {
             var mac = _state.MAC;
@@ -92,6 +115,7 @@ namespace Breadbox.Packages.Vic2
             // MAC
 
             var incrementMac = Expression.PreIncrementAssign(mac);
+            var noAccess = Expression.Constant(0x3FFF);
 
             // C accesses
 
@@ -100,10 +124,10 @@ namespace Breadbox.Packages.Vic2
             var colorAssign = Util.Void(_state.Dn.AssignUsing(vmli, Expression.Assign(_state.CBUFFER, Expression.Or(readData(colorAccess), Expression.LeftShift(readColorMemory(colorAccess), Expression.Constant(8))))));
             var colorClear = Util.Void(Expression.Assign(_state.CBUFFER, Expression.Constant(0)));
             var colorClearTest = Expression.Constant(((41*2) + 47)%macCycles);
+            var colorAssignOnBadline = Expression.IfThenElse(_state.BADLINE, colorAssign, Util.Void(readData(noAccess)));
 
             // G accesses
 
-            var noAccess = Expression.Constant(0x3FFF);
             var idleAccess = Expression.Condition(ecm, Expression.Constant(0x39FF), Expression.Constant(0x3FFF));
             var characterPointer = Expression.And(_state.Dn.SelectUsing(vmli), Expression.Constant(0xFF));
             var characterAccess = Util.Or(Expression.LeftShift(cb, Expression.Constant(11)),
@@ -130,7 +154,9 @@ namespace Breadbox.Packages.Vic2
             Func<int, Expression[]> spriteDataAccessTests = spriteNumber => Enumerable.Range((spriteNumber * 4) + 7, 3).Select(i => (Expression)Expression.Constant(i)).ToArray();
 
             Func<int, Expression> spritePointerAssign = spriteNumber => Util.Void(Expression.Assign(mp[spriteNumber], spritePointerAccess(spriteNumber)));
-            Func<int, Expression> spriteDataAssign = spriteNumber => Util.Void(Expression.LeftShiftAssign(md[spriteNumber], Expression.Constant(8)), Expression.OrAssign(md[spriteNumber], readData(spriteDataAccess(spriteNumber))));
+            Func<int, Expression> spriteDataAssign = spriteNumber => Expression.IfThenElse(_state.MnE[spriteNumber],
+                Util.Void(Expression.LeftShiftAssign(md[spriteNumber], Expression.Constant(8)), Expression.OrAssign(md[spriteNumber], readData(spriteDataAccess(spriteNumber)))),
+                Util.Void(readData(noAccess)));
 
             // all together now
 
@@ -155,7 +181,7 @@ namespace Breadbox.Packages.Vic2
                     Expression.SwitchCase(spriteDataAssign(6), spriteDataAccessTests(6)),
                     Expression.SwitchCase(spriteDataAssign(7), spriteDataAccessTests(7)),
                     Expression.SwitchCase(graphicsAssign, graphicsAccessTests),
-                    Expression.SwitchCase(colorAssign, colorAccessTests),
+                    Expression.SwitchCase(colorAssignOnBadline, colorAccessTests),
                     Expression.SwitchCase(colorClear, colorClearTest),
                     Expression.SwitchCase(refreshAssign, refreshTests)
                 ));

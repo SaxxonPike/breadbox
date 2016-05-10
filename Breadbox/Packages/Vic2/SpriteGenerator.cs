@@ -22,7 +22,11 @@ namespace Breadbox.Packages.Vic2
             var multicolor = _state.MnMC[spriteNumber];
             var mxmc = _state.MXMCn[spriteNumber];
             var newMxmc = Expression.Assign(mxmc,Expression.Not(mxmc));
-            return Expression.LeftShiftAssign(_state.MDn[spriteNumber], Expression.Condition(multicolor, Expression.Condition(newMxmc, Expression.Constant(2), Expression.Constant(0)), Expression.Constant(1)));
+            var shiftAssign = Expression.LeftShiftAssign(_state.MDn[spriteNumber],
+                Expression.Condition(multicolor,
+                    Expression.Condition(newMxmc, Expression.Constant(2), Expression.Constant(0)),
+                    Expression.Constant(1)));
+            return Expression.IfThen(_state.MSREn[spriteNumber], shiftAssign);
         }
 
         public Expression OutputColor(int spriteNumber)

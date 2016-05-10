@@ -41,6 +41,10 @@ namespace Breadbox.Packages.Vic2
         public int ClocksPerRasterValue { get { return _clocksPerRaster; } }
         public int RastersPerFrameValue { get { return _rastersPerFrame; } }
         public int HBlankSetXValue { get { return _hBlankSetX; } }
+        public int HBlankClearXValue { get { return _hBlankClearX; } }
+        public int RasterStartXValue { get { return _rasterStartX; } }
+        public int VBlankSetYValue { get { return _vBlankSetY; } }
+        public int VBlankClearYValue { get { return _vBlankClearY; } }
 
         public Expression ClocksPerRaster { get { return Expression.Constant(_clocksPerRaster);} }
         public Expression RastersPerFrame { get { return Expression.Constant(_rastersPerFrame); } }
