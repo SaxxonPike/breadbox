@@ -21,29 +21,6 @@ namespace Breadbox.Packages.Vic2
             _spriteGenerator = new SpriteGenerator(_state, _config);
         }
 
-        private Expression GenerateDecoder(IEnumerable<Tuple<int, Expression>> decodes, Expression comparedValue)
-        {
-            var presentDecodes = decodes.Where(d => d.Item2 != null).ToList();
-            if (presentDecodes.Count == 0)
-            {
-                return Expression.Empty();
-            }
-            if (presentDecodes.Count == 1)
-            {
-                return Expression.IfThen(Expression.Equal(Expression.Constant(presentDecodes[0].Item1), comparedValue), presentDecodes[0].Item2);
-            }
-            return Expression.Switch(comparedValue, GenerateDecodes(presentDecodes));
-        }
-
-        private SwitchCase[] GenerateDecodes(IEnumerable<Tuple<int, Expression>> decodes)
-        {
-            return
-                decodes.GroupBy(d => d.Item1).Select(
-                    g =>
-                        Expression.SwitchCase(Util.Void(g.Select(pair => pair.Item2).ToArray()),
-                            Expression.Constant(g.Key))).ToArray();
-        }
-
         private Expression Cycle1
         {
             get
@@ -53,14 +30,14 @@ namespace Breadbox.Packages.Vic2
 
                 var verticalDecodes = new[]
                 {
-                    new Tuple<int, Expression>(_config.RastersPerFrameValue, Raster0),
-                    new Tuple<int, Expression>(_config.VBlankSetYValue, Expression.Assign(vblank, Expression.Constant(true))),
-                    new Tuple<int, Expression>(_config.VBlankClearYValue, Expression.Assign(vblank, Expression.Constant(false)))
+                    new Tuple<Expression, Expression>(_config.RastersPerFrame, Raster0),
+                    new Tuple<Expression, Expression>(_config.VBlankSetY, Expression.Assign(vblank, Expression.Constant(true))),
+                    new Tuple<Expression, Expression>(_config.VBlankClearY, Expression.Assign(vblank, Expression.Constant(false)))
                 };
 
                 return Util.Void(
                     Expression.PreIncrementAssign(rastery),
-                    GenerateDecoder(verticalDecodes, rastery)
+                    Util.Decode(verticalDecodes, rastery)
                     );
             }
         }
@@ -90,21 +67,16 @@ namespace Breadbox.Packages.Vic2
                 Expression.LessThanOrEqual(rasterxcounter,
                     Expression.Constant(_config.HBlankSetXValue + (_config.ClocksPerRasterValue - 512)))) : null;
 
-            var counterDecodes = new[]
+            var decodes = new List<Tuple<Expression, Expression>>
             {
-                new Tuple<int, Expression>(_config.ClocksPerRasterValue, ResetX(rasterx, rasterxcounter)),
-            };
-
-            var positionDecodes = new[]
-            {
-                new Tuple<int, Expression>(_config.HBlankSetXValue, Expression.Assign(_state.HBLANK, Expression.Constant(true))),
-                new Tuple<int, Expression>(_config.HBlankClearXValue, Expression.Assign(_state.HBLANK, Expression.Constant(false))),
-                new Tuple<int, Expression>(_config.RasterStartXValue, Cycle1),
+                new Tuple<Expression, Expression>(_config.ClocksPerRaster, ResetX(rasterx, rasterxcounter)),
+                new Tuple<Expression, Expression>(_config.RasterXToCounterX(_config.HBlankSetXValue), Expression.Assign(_state.HBLANK, Expression.Constant(true))),
+                new Tuple<Expression, Expression>(_config.RasterXToCounterX(_config.HBlankClearXValue), Expression.Assign(_state.HBLANK, Expression.Constant(false))),
+                new Tuple<Expression, Expression>(_config.RasterXToCounterX(_config.RasterStartXValue), Cycle1)
             };
 
             var notHeldX = Util.Void(
                 Expression.PreIncrementAssign(rasterx),
-                GenerateDecoder(positionDecodes, rasterx),
                 _graphicsGenerator.Clock,
                 _spriteGenerator.Clock(0),
                 _spriteGenerator.Clock(1),
@@ -119,11 +91,11 @@ namespace Breadbox.Packages.Vic2
             var block = new[]
             {
                 Expression.PreIncrementAssign(rasterxcounter),
-                GenerateDecoder(counterDecodes, rasterxcounter), 
+                Util.Decode(decodes, rasterxcounter),
                 shouldHoldX != null ? Expression.IfThen(Expression.Not(shouldHoldX), notHeldX) : notHeldX,
-                clock2mhz != null ? Expression.IfThen(Expression.Equal(Expression.And(rasterxcounter, Expression.Constant(0x3)), Expression.Constant(0)), clock2mhz) : null,
-                phi1 != null ? Expression.IfThen(Expression.Equal(Expression.And(rasterxcounter, Expression.Constant(0x7)), Expression.Constant(0)), phi1) : null,
-                phi2 != null ? Expression.IfThen(Expression.Equal(Expression.And(rasterxcounter, Expression.Constant(0x7)), Expression.Constant(4)), phi2) : null,
+                clock2mhz == null ? null : Util.Decode(Enumerable.Range(0, _config.ClocksPerRasterValue / 4).Select(c => new Tuple<Expression, Expression>(Expression.Constant(c * 4), clock2mhz)), rasterxcounter),
+                phi1 == null ? null : Util.Decode(Enumerable.Range(0, _config.ClocksPerRasterValue / 8).Select(c => new Tuple<Expression, Expression>(Expression.Constant((c * 8) + 0), phi1)), rasterxcounter),
+                phi2 == null ? null : Util.Decode(Enumerable.Range(0, _config.ClocksPerRasterValue / 8).Select(c => new Tuple<Expression, Expression>(Expression.Constant((c * 8) + 4), phi2)), rasterxcounter),
                 clockOutput
             };
 

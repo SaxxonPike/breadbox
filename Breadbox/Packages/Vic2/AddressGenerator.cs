@@ -72,9 +72,9 @@ namespace Breadbox.Packages.Vic2
         {
             get
             {
-                return Expression.Switch(_state.RASTER,
+                return Util.Simplify(Expression.Switch(_state.RASTER,
                     Expression.SwitchCase(Util.Void(Expression.Assign(_state.BADLINEENABLE, Expression.OrElse(_state.BADLINE, _state.DEN))), Expression.Constant(0x030)),
-                    Expression.SwitchCase(Util.Void(Expression.Assign(_state.BADLINE, Expression.Assign(_state.BADLINEENABLE, Expression.Constant(false)))), Expression.Constant(0x0F8)));
+                    Expression.SwitchCase(Util.Void(Expression.Assign(_state.BADLINE, Expression.Assign(_state.BADLINEENABLE, Expression.Constant(false)))), Expression.Constant(0x0F8))));
             }
         }
 
@@ -162,6 +162,7 @@ namespace Breadbox.Packages.Vic2
 
             return Util.Void(
                 incrementMac,
+                Util.Simplify(
                 Expression.Switch(mac,
                     Util.Void(readData(Expression.Condition(Expression.Equal(Expression.And(mac, Expression.Constant(1)), Expression.Constant(0)), idleAccess, noAccess))),
                     Expression.SwitchCase(spritePointerAssign(0), spritePointerAccessTest(0)),
@@ -184,7 +185,7 @@ namespace Breadbox.Packages.Vic2
                     Expression.SwitchCase(colorAssignOnBadline, colorAccessTests),
                     Expression.SwitchCase(colorClear, colorClearTest),
                     Expression.SwitchCase(refreshAssign, refreshTests)
-                ));
+                )));
         }
     }
 }

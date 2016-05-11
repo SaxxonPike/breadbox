@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 
 namespace Breadbox
@@ -137,6 +138,72 @@ namespace Breadbox
                 .Aggregate(innermost,
                     (baseExpression, testExpression) =>
                         Expression.IfThenElse(testExpression[0], testExpression[1], baseExpression));
+        }
+
+        public static Expression Decode(IEnumerable<Tuple<int, Expression>> conditions, Expression valueToDecode)
+        {
+            return
+                Decode(
+                    conditions.Select(c => new Tuple<Expression, Expression>(Expression.Constant(c.Item1), c.Item2)),
+                    valueToDecode);
+        }
+
+        public static Expression Decode(IEnumerable<Tuple<Expression, Expression>> conditions, Expression valueToDecode)
+        {
+            var presentDecodes = conditions.Where(d => d.Item2 != null).ToList();
+            if (presentDecodes.Count == 0)
+            {
+                return Expression.Empty();
+            }
+            if (presentDecodes.Count == 1)
+            {
+                return Expression.IfThen(Expression.Equal(presentDecodes[0].Item1, valueToDecode), presentDecodes[0].Item2);
+            }
+            return Simplify(Expression.Switch(valueToDecode, GenerateDecodes(presentDecodes)));
+        }
+
+        public static Expression Simplify(SwitchExpression expression)
+        {
+            var cases = expression.Cases.Where(c => c.TestValues.Count > 0).OrderBy(c => ((ConstantExpression)c.TestValues.First()).Value).ToArray();
+            var newCases = new List<SwitchCase>();
+            var debugViewCache = new List<string>();
+
+            foreach (var switchCase in cases)
+            {
+                var switchCaseDebugView = switchCase.Body.GetDebugView();
+                var existingIndex = debugViewCache.IndexOf(switchCaseDebugView);
+                if (existingIndex >= 0)
+                {
+                    var existingCase = newCases[existingIndex];
+                    newCases[existingIndex] = Expression.SwitchCase(existingCase.Body, existingCase.TestValues.Concat(switchCase.TestValues));
+                }
+                else
+                {
+                    newCases.Add(switchCase.Update(switchCase.TestValues.OrderBy(c => ((ConstantExpression)c).Value), switchCase.Body));
+                    debugViewCache.Add(switchCaseDebugView);
+                }
+            }
+
+            return expression.Update(expression.SwitchValue, newCases, expression.DefaultBody);
+        }
+
+        private static SwitchCase[] GenerateDecodes(IEnumerable<Tuple<Expression, Expression>> decodes)
+        {
+            return
+                decodes.GroupBy(d => ((ConstantExpression)d.Item1).Value).Select(
+                    g =>
+                        Expression.SwitchCase(Void(g.Select(pair => pair.Item2).ToArray()),
+                            Expression.Constant(g.Key))).ToArray();
+        }
+
+        public static string GetDebugView(this Expression exp)
+        {
+            if (exp == null)
+                return null;
+
+            var propertyInfo = typeof(Expression).GetProperty("DebugView", BindingFlags.Instance | BindingFlags.NonPublic);
+            var debugView = propertyInfo.GetValue(exp, null) as string;
+            return debugView;
         }
     }
 }

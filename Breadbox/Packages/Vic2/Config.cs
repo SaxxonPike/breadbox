@@ -55,6 +55,40 @@ namespace Breadbox.Packages.Vic2
         public Expression FetchSprite0BaX { get { return Expression.Constant(_fetchSprite0BaX); } }
         public Expression RasterStartX { get { return Expression.Constant(_rasterStartX); } }
 
+        public Expression RasterXToCounterX(int rasterX)
+        {
+            while (rasterX < 0)
+            {
+                rasterX += _clocksPerRaster;
+            }
+
+            while (rasterX >= _clocksPerRaster)
+            {
+                rasterX -= _clocksPerRaster;
+            }
+
+            if (_clocksPerRaster <= 512 || rasterX <= _hBlankSetX)
+            {
+                return Expression.Constant(rasterX);
+            }
+
+            return Expression.Constant(rasterX + (512 - _clocksPerRaster));
+        }
+
+        public Expression CycleToCounterX(int cycleNumber, bool rising)
+        {
+            var result = _rasterStartX + (cycleNumber*8) + (rising ? 0 : 4);
+            while (result < 0)
+            {
+                result += _clocksPerRaster;
+            }
+            while (result >= _clocksPerRaster)
+            {
+                result -= _clocksPerRaster;
+            }
+            return Expression.Constant(result);
+        }
+
         public int VideoWidth
         {
             get
