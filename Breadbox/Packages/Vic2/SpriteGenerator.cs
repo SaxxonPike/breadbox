@@ -11,13 +11,36 @@ namespace Breadbox.Packages.Vic2
         private readonly State _state;
         private readonly Config _config;
 
+        private readonly Expression[] _outputColor;
+        private readonly Expression[] _outputData;
+        private readonly Expression[] _clock;
+
         public SpriteGenerator(State state, Config config)
         {
             _state = state;
             _config = config;
+
+            _outputColor = Enumerable.Range(0, 8).Select(GetOutputColor).ToArray();
+            _outputData = Enumerable.Range(0, 8).Select(GetOutputData).ToArray();
+            _clock = Enumerable.Range(0, 8).Select(GetClock).ToArray();
         }
 
         public Expression Clock(int spriteNumber)
+        {
+            return _clock[spriteNumber];
+        }
+
+        public Expression OutputColor(int spriteNumber)
+        {
+            return _outputColor[spriteNumber];
+        }
+
+        public Expression OutputData(int spriteNumber)
+        {
+            return _outputData[spriteNumber];
+        }
+
+        private Expression GetClock(int spriteNumber)
         {
             var multicolor = _state.MnMC[spriteNumber];
             var mxmc = _state.MXMCn[spriteNumber];
@@ -26,10 +49,10 @@ namespace Breadbox.Packages.Vic2
                 Expression.Condition(multicolor,
                     Expression.Condition(newMxmc, Expression.Constant(2), Expression.Constant(0)),
                     Expression.Constant(1)));
-            return Expression.IfThen(_state.MSREn[spriteNumber], shiftAssign);
+            return Util.Invoke(Expression.IfThen(_state.MSREn[spriteNumber], shiftAssign));
         }
 
-        public Expression OutputColor(int spriteNumber)
+        private Expression GetOutputColor(int spriteNumber)
         {
             var mobData = _state.MDn[spriteNumber];
             var multiColorSprite = _state.MnMC[spriteNumber];
@@ -43,14 +66,14 @@ namespace Breadbox.Packages.Vic2
                 Expression.SwitchCase(_state.MM0, Expression.Constant(0x400000)),
                 Expression.SwitchCase(foregroundColor, Expression.Constant(0x800000)),
                 Expression.SwitchCase(_state.MM1, Expression.Constant(0xC00000)));
-            return Expression.Condition(multiColorSprite, multiColor, singleColor);
+            return Util.Invoke(Expression.Condition(multiColorSprite, multiColor, singleColor));
         }
 
-        public Expression OutputData(int spriteNumber)
+        private Expression GetOutputData(int spriteNumber)
         {
             var mobData = _state.MDn[spriteNumber];
             var multiColorSprite = _state.MnMC[spriteNumber];
-            return Expression.And(mobData, Expression.Condition(multiColorSprite, Expression.Constant(0xC00000), Expression.Constant(0x800000)));
+            return Util.Invoke(Expression.And(mobData, Expression.Condition(multiColorSprite, Expression.Constant(0xC00000), Expression.Constant(0x800000))));
         }
     }
 }

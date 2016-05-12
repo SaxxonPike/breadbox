@@ -116,6 +116,7 @@ namespace Breadbox.Packages.Vic2
 
             var incrementMac = Expression.PreIncrementAssign(mac);
             var noAccess = Expression.Constant(0x3FFF);
+            var noRead = readData(noAccess);
 
             // C accesses
 
@@ -127,6 +128,7 @@ namespace Breadbox.Packages.Vic2
             // G accesses
 
             var idleAccess = Expression.Condition(ecm, Expression.Constant(0x39FF), Expression.Constant(0x3FFF));
+            var idleRead = readData(idleAccess);
             var characterPointer = Expression.And(_state.Dn.SelectUsing(vmli), Expression.Constant(0xFF));
             var characterAccess = Util.Or(Expression.LeftShift(cb, Expression.Constant(11)),
                 Expression.LeftShift(characterPointer, Expression.Constant(3)), rc);
@@ -156,19 +158,27 @@ namespace Breadbox.Packages.Vic2
 
             var result = new List<Tuple<Expression, Expression>>();
 
-            result.AddRange(Enumerable.Range(0, 3).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(0 + i * 2), idleAccess)));
-            result.AddRange(Enumerable.Range(0, 3).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(1 + i * 2), noAccess)));
-            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(6 + (i * 4)), spritePointerAssign(i))));
-            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(7 + (i * 4)), spriteDataAssign(i))));
-            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(8 + (i * 4)), spriteDataAssign(i))));
-            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(9 + (i * 4)), spriteDataAssign(i))));
-            result.AddRange(Enumerable.Range(0, 5).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(38 + (i * 2)), refreshAssign)));
-            result.AddRange(Enumerable.Range(0, 4).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(39 + i * 2), noAccess)));
-            result.AddRange(Enumerable.Range(0, 40).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(47 + (i * 2)), colorAssignOnBadline)));
-            result.AddRange(Enumerable.Range(0, 40).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(48 + (i * 2)), graphicsAssign)));
+            var invokeI = Util.Invoke(idleRead);
+            var invokeX = Util.Invoke(noRead);
+            var invokeR = Util.Invoke(refreshAssign);
+            var invokeC = Util.Invoke(colorAssignOnBadline);
+            var invokeG = Util.Invoke(graphicsAssign);
+            var invokeS = Enumerable.Range(0, 8).Select(spriteDataAssign).Select(Util.Invoke).ToArray();
+            var invokeP = Enumerable.Range(0, 8).Select(spritePointerAssign).Select(Util.Invoke).ToArray();
+
+            result.AddRange(Enumerable.Range(0, 2).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(2 + i * 2), invokeI)));
+            result.AddRange(Enumerable.Range(0, 2).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(3 + i * 2), invokeX)));
+            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(6 + (i * 4)), invokeP[i])));
+            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(7 + (i * 4)), invokeS[i])));
+            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(8 + (i * 4)), invokeS[i])));
+            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(9 + (i * 4)), invokeS[i])));
+            result.AddRange(Enumerable.Range(0, 5).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(38 + (i * 2)), invokeR)));
+            result.AddRange(Enumerable.Range(0, 4).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(39 + i * 2), invokeX)));
+            result.AddRange(Enumerable.Range(0, 40).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(47 + (i * 2)), invokeC)));
+            result.AddRange(Enumerable.Range(0, 40).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(48 + (i * 2)), invokeG)));
             result.Add(new Tuple<Expression, Expression>(_config.MacToCounterX(127), colorClear));
-            result.AddRange(Enumerable.Range(0, (_config.ClocksPerRasterValue - 0x1F8) / 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(127 + (i * 2)), noAccess)));
-            result.AddRange(Enumerable.Range(0, (_config.ClocksPerRasterValue - 0x1F8) / 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(128 + (i * 2)), idleAccess)));
+            result.AddRange(Enumerable.Range(0, (_config.ClocksPerRasterValue - 0x1F8) / 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(127 + (i * 2)), invokeX)));
+            result.AddRange(Enumerable.Range(0, (_config.ClocksPerRasterValue - 0x1F8) / 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(128 + (i * 2)), invokeI)));
 
             return result;
         }

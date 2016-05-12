@@ -16,7 +16,9 @@ namespace Breadbox.Packages
             0x00D,
             0x028,
             0x15C,
-            0x19C
+            0x19C,
+            14318181,
+            14
             ))
         {
         }

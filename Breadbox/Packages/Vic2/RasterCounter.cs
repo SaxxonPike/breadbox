@@ -10,6 +10,7 @@ namespace Breadbox.Packages.Vic2
     {
         private readonly State _state;
         private readonly Config _config;
+        private readonly AddressGenerator _addressGenerator;
         private readonly GraphicsGenerator _graphicsGenerator;
         private readonly SpriteGenerator _spriteGenerator;
 
@@ -17,6 +18,7 @@ namespace Breadbox.Packages.Vic2
         {
             _state = state;
             _config = config;
+            _addressGenerator = new AddressGenerator(_state, _config);
             _graphicsGenerator = new GraphicsGenerator(_state, _config);
             _spriteGenerator = new SpriteGenerator(_state, _config);
         }
@@ -35,10 +37,7 @@ namespace Breadbox.Packages.Vic2
                     new Tuple<Expression, Expression>(_config.VBlankClearY, Expression.Assign(vblank, Expression.Constant(false)))
                 };
 
-                return Util.Void(
-                    Expression.PreIncrementAssign(rastery),
-                    Util.Decode(verticalDecodes, rastery)
-                    );
+                return Util.Decode(verticalDecodes, Expression.PreIncrementAssign(rastery));
             }
         }
 
@@ -54,12 +53,10 @@ namespace Breadbox.Packages.Vic2
 
         private Expression ResetX(Expression rasterx, Expression rasterxc)
         {
-            return Util.Void(
-                Expression.Assign(rasterx, Expression.Constant(0)),
-                Expression.Assign(rasterxc, Expression.Constant(0)));
+            return Expression.Assign(rasterx, Expression.Assign(rasterxc, Expression.Constant(0)));
         }
 
-        public Expression Clock(Expression clock2mhz, Expression phi1, Expression phi2, Expression clockOutput)
+        public Expression Clock(Func<Expression, Expression> readData, Func<Expression, Expression> readColor, Expression phi1, Expression phi2, Expression clockOutput)
         {
             var rasterx = _state.RASTERX;
             var rasterxcounter = _state.RASTERXC;
@@ -75,17 +72,19 @@ namespace Breadbox.Packages.Vic2
                 new Tuple<Expression, Expression>(_config.RasterXToCounterX(_config.RasterStartXValue), Cycle1)
             };
 
+            decodes.AddRange(_addressGenerator.GetDecodes(readData, readColor));
+
             var notHeldX = Util.Void(
                 Expression.PreIncrementAssign(rasterx),
-                _graphicsGenerator.Clock,
-                _spriteGenerator.Clock(0),
-                _spriteGenerator.Clock(1),
-                _spriteGenerator.Clock(2),
-                _spriteGenerator.Clock(3),
-                _spriteGenerator.Clock(4),
-                _spriteGenerator.Clock(5),
-                _spriteGenerator.Clock(6),
-                _spriteGenerator.Clock(7)
+                Util.Invoke(_graphicsGenerator.Clock),
+                Util.Invoke(_spriteGenerator.Clock(0)),
+                Util.Invoke(_spriteGenerator.Clock(1)),
+                Util.Invoke(_spriteGenerator.Clock(2)),
+                Util.Invoke(_spriteGenerator.Clock(3)),
+                Util.Invoke(_spriteGenerator.Clock(4)),
+                Util.Invoke(_spriteGenerator.Clock(5)),
+                Util.Invoke(_spriteGenerator.Clock(6)),
+                Util.Invoke(_spriteGenerator.Clock(7))
                 );
 
             var block = new[]
@@ -93,13 +92,12 @@ namespace Breadbox.Packages.Vic2
                 Expression.PreIncrementAssign(rasterxcounter),
                 Util.Decode(decodes, rasterxcounter),
                 shouldHoldX != null ? Expression.IfThen(Expression.Not(shouldHoldX), notHeldX) : notHeldX,
-                clock2mhz == null ? null : Util.Decode(Enumerable.Range(0, _config.ClocksPerRasterValue / 4).Select(c => new Tuple<Expression, Expression>(Expression.Constant(c * 4), clock2mhz)), rasterxcounter),
-                phi1 == null ? null : Util.Decode(Enumerable.Range(0, _config.ClocksPerRasterValue / 8).Select(c => new Tuple<Expression, Expression>(Expression.Constant((c * 8) + 0), phi1)), rasterxcounter),
-                phi2 == null ? null : Util.Decode(Enumerable.Range(0, _config.ClocksPerRasterValue / 8).Select(c => new Tuple<Expression, Expression>(Expression.Constant((c * 8) + 4), phi2)), rasterxcounter),
+                phi1 == null ? null : Util.Decode(Enumerable.Range(0, _config.ClocksPerRasterValue / 8).Select(c => new Tuple<Expression, Expression>(Expression.Constant((c * 8) + 0), Util.Invoke(phi1))), rasterxcounter),
+                phi2 == null ? null : Util.Decode(Enumerable.Range(0, _config.ClocksPerRasterValue / 8).Select(c => new Tuple<Expression, Expression>(Expression.Constant((c * 8) + 4), Util.Invoke(phi2))), rasterxcounter),
                 clockOutput
             };
 
-            return Util.Void(block.Where(e => e != null).ToArray());
+            return Util.Void(block);
         }
     }
 }

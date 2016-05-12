@@ -43,6 +43,7 @@
     <Compile Include="Packages\Mos6567R56A.cs" />
     <Compile Include="Packages\Mos6567R8.cs" />
     <Compile Include="Packages\Mos6569.cs" />
+    <Compile Include="Packages\Mos6572.cs" />
     <Compile Include="Packages\Ram1x4.cs" />
     <Compile Include="Packages\Ram64x8.cs" />
     <Compile Include="Packages\Memory\Package.cs" />

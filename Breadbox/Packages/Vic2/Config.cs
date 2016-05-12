@@ -16,6 +16,8 @@ namespace Breadbox.Packages.Vic2
         private readonly int _vBlankClearY;
         private readonly int _fetchSprite0BaX;
         private readonly int _rasterStartX;
+        private readonly int _clockHzNum;
+        private readonly int _clockHzDen;
 
         public Config(
             int clocksPerRaster,
@@ -25,7 +27,9 @@ namespace Breadbox.Packages.Vic2
             int vBlankSetY,
             int vBlankClearY,
             int fetchSprite0BaX,
-            int rasterStartX
+            int rasterStartX,
+            int baseClockHz,
+            int dividerClockHz
             )
         {
             _clocksPerRaster = clocksPerRaster;
@@ -36,6 +40,9 @@ namespace Breadbox.Packages.Vic2
             _vBlankClearY = vBlankClearY;
             _fetchSprite0BaX = fetchSprite0BaX;
             _rasterStartX = rasterStartX;
+
+            _clockHzNum = baseClockHz*8;
+            _clockHzDen = dividerClockHz;
         }
 
         public int ClocksPerRasterValue { get { return _clocksPerRaster; } }
@@ -45,6 +52,8 @@ namespace Breadbox.Packages.Vic2
         public int RasterStartXValue { get { return _rasterStartX; } }
         public int VBlankSetYValue { get { return _vBlankSetY; } }
         public int VBlankClearYValue { get { return _vBlankClearY; } }
+        public int ClockHzNumValue { get { return _clockHzNum; } }
+        public int ClockHzDenValue { get { return _clockHzDen; } }
 
         public Expression ClocksPerRaster { get { return Expression.Constant(_clocksPerRaster);} }
         public Expression RastersPerFrame { get { return Expression.Constant(_rastersPerFrame); } }
@@ -91,7 +100,7 @@ namespace Breadbox.Packages.Vic2
 
         public Expression CycleToCounterX(int cycleNumber, bool rising)
         {
-            var result = _rasterStartX + (cycleNumber*8) + (rising ? 0 : 4);
+            var result = _rasterStartX + ((cycleNumber - 1)*8) + (rising ? 0 : 4);
             while (result < 0)
             {
                 result += _clocksPerRaster;

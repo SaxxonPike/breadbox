@@ -18,17 +18,13 @@ namespace Breadbox.Test.Packages
             var vic2 = new Mos6567R8();
             var colorRam = new Ram1x4();
             var systemRam = new Ram64x8();
-            var frame = vic2.Frame(systemRam.Read, colorRam.Read, null, null);
-            var framesPerSecond = 60;
+            var second = vic2.Clock(vic2.CyclesPerSecond, systemRam.Read, colorRam.Read, null, null);
             var sw = new Stopwatch();
 
-            var frameFunc = Expression.Lambda<Action>(frame).Compile();
-            frameFunc();
+            var secondFunc = Expression.Lambda<Action>(second).Compile();
+            secondFunc();
             sw.Start();
-            for (var i = 0; i < framesPerSecond; i++)
-            {
-                frameFunc();
-            }
+            secondFunc();
             sw.Stop();
             Console.WriteLine(sw.ElapsedMilliseconds);
             sw.Reset();

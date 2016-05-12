@@ -6,18 +6,18 @@ using Breadbox.Packages.Vic2;
 
 namespace Breadbox.Packages
 {
-    public class Mos6567R56A : Package
+    public class Mos6572 : Package
     {
-        public Mos6567R56A() : base(new Config(
-            512,
-            262,
-            0x184,
+        public Mos6572() : base(new Config(
+            520,
+            312,
+            0x18C,
             0x1F0,
-            0x00D,
-            0x028,
-            0x154,
+            0x12C,
+            0x00F,
+            0x15C,
             0x19C,
-            14318181,
+            14328224,
             14
             ))
         {

@@ -45,13 +45,19 @@ namespace Breadbox
 
         public static Expression Void(params Expression[] expressions)
         {
+            expressions = expressions.Where(e => e != null).ToArray();
             if (expressions.Length == 0)
             {
                 return Expression.Empty();
             }
             if (expressions.Length == 1 && expressions.First().Type == typeof(void))
             {
-                return expressions.First();
+                var expression = expressions.First();
+                if (expression is BlockExpression && (expression as BlockExpression).Variables.Count == 0)
+                {
+                    return Void((expression as BlockExpression).Expressions.ToArray());
+                }
+                return expression;
             }
             if (expressions.All(e => e is BlockExpression))
             {
@@ -67,9 +73,9 @@ namespace Breadbox
             }
             if (expressions.Last().Type != typeof(void))
             {
-                return Expression.Block(new ParameterExpression[0], expressions.Concat(new[] { Expression.Empty() }).ToArray());
+                return Expression.Block(expressions.Concat(new[] { Expression.Empty() }).ToArray());
             }
-            return Expression.Block(new ParameterExpression[0], expressions);
+            return Expression.Block(expressions);
         }
 
         public static Expression Action(Expression<Action> actionLambda)
@@ -204,6 +210,15 @@ namespace Breadbox
             var propertyInfo = typeof(Expression).GetProperty("DebugView", BindingFlags.Instance | BindingFlags.NonPublic);
             var debugView = propertyInfo.GetValue(exp, null) as string;
             return debugView;
+        }
+
+        public static Expression Invoke(Expression func)
+        {
+            if (func is InvocationExpression)
+            {
+                return func;
+            }
+            return Expression.Invoke(Expression.Lambda(func));
         }
     }
 }

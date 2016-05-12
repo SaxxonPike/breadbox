@@ -96,7 +96,7 @@ namespace Breadbox.Packages.Vic2
         {
             get
             {
-                return Expression.And(_state.GD, Expression.Condition(_state.MCM, Expression.Constant(0xC0), Expression.Constant(0x80)));
+                return Util.Invoke(Expression.And(_state.GD, Expression.Condition(_state.MCM, Expression.Constant(0xC0), Expression.Constant(0x80))));
             }
         }
 
@@ -105,9 +105,9 @@ namespace Breadbox.Packages.Vic2
             get
             {
                 var isInvalid = Expression.AndAlso(_state.ECM, Expression.OrElse(_state.MCM, _state.BMM));
-                return Expression.Condition(isInvalid, Expression.Constant(0),
+                return Util.Invoke(Expression.Condition(isInvalid, Expression.Constant(0),
                     Expression.Condition(_state.BMM, BitmapColor,
-                        Expression.Condition(_state.ECM, ExtraColor, CharacterColor)));
+                        Expression.Condition(_state.ECM, ExtraColor, CharacterColor))));
             }
         }
     }
