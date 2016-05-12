@@ -91,7 +91,7 @@ namespace Breadbox.Packages.Vic2
             }
         }
 
-        public Expression Clock(Func<Expression, Expression> readData, Func<Expression, Expression> readColorMemory)
+        public IEnumerable<Tuple<Expression, Expression>> GetDecodes(Func<Expression, Expression> readData, Func<Expression, Expression> readColorMemory)
         {
             var mac = _state.MAC;
             var ecm = _state.ECM;
@@ -120,10 +120,8 @@ namespace Breadbox.Packages.Vic2
             // C accesses
 
             var colorAccess = Expression.Or(Expression.LeftShift(vm, Expression.Constant(10)), vc);
-            var colorAccessTests = Enumerable.Range(0, 40).Select(i => Expression.Constant(((i * 2) + 47) % macCycles));
             var colorAssign = Util.Void(_state.Dn.AssignUsing(vmli, Expression.Assign(_state.CBUFFER, Expression.Or(readData(colorAccess), Expression.LeftShift(readColorMemory(colorAccess), Expression.Constant(8))))));
             var colorClear = Util.Void(Expression.Assign(_state.CBUFFER, Expression.Constant(0)));
-            var colorClearTest = Expression.Constant(((41*2) + 47)%macCycles);
             var colorAssignOnBadline = Expression.IfThenElse(_state.BADLINE, colorAssign, Util.Void(readData(noAccess)));
 
             // G accesses
@@ -137,21 +135,17 @@ namespace Breadbox.Packages.Vic2
                     Expression.LeftShift(vc, Expression.Constant(3)), rc);
             var nonIdleGraphicsAccess = Expression.And(idleAccess, Expression.Condition(bmm, bitmapAccess, characterAccess));
             var graphicsAccess = Expression.Condition(idle, idleAccess, nonIdleGraphicsAccess);
-            var graphicsAccessTests = Enumerable.Range(0, 40).Select(i => Expression.Constant(((i*2) + 48) % macCycles));
             var graphicsAssign = Util.Void(Expression.Assign(gd, readData(graphicsAccess)), Expression.PreIncrementAssign(vmli), Expression.PreIncrementAssign(vc));
 
             // R accesses
 
             var refreshAccess = Expression.Or(Expression.Constant(0x3F00), refresh);
             var refreshAssign = Util.Void(Expression.Assign(refresh, Expression.And(Expression.Decrement(refresh), Expression.Constant(0xFF))), readData(refreshAccess));
-            var refreshTests = Enumerable.Range(0, 5).Select(i => Expression.Constant(38 + (i*2)));
 
             // S and P accesses
 
             Func<int, Expression> spritePointerAccess = spriteNumber => Util.Or(Expression.Constant(spriteNumber | 0x1F8), Expression.LeftShift(vm, Expression.Constant(10)));
             Func<int, Expression> spriteDataAccess = spriteNumber => Util.Or(Expression.LeftShift(mp[spriteNumber], Expression.Constant(6)), mc[spriteNumber]);
-            Func<int, Expression> spritePointerAccessTest = spriteNumber => Expression.Constant((spriteNumber * 4) + 6);
-            Func<int, Expression[]> spriteDataAccessTests = spriteNumber => Enumerable.Range((spriteNumber * 4) + 7, 3).Select(i => (Expression)Expression.Constant(i)).ToArray();
 
             Func<int, Expression> spritePointerAssign = spriteNumber => Util.Void(Expression.Assign(mp[spriteNumber], spritePointerAccess(spriteNumber)));
             Func<int, Expression> spriteDataAssign = spriteNumber => Expression.IfThenElse(_state.MnE[spriteNumber],
@@ -160,32 +154,23 @@ namespace Breadbox.Packages.Vic2
 
             // all together now
 
-            return Util.Void(
-                incrementMac,
-                Util.Simplify(
-                Expression.Switch(mac,
-                    Util.Void(readData(Expression.Condition(Expression.Equal(Expression.And(mac, Expression.Constant(1)), Expression.Constant(0)), idleAccess, noAccess))),
-                    Expression.SwitchCase(spritePointerAssign(0), spritePointerAccessTest(0)),
-                    Expression.SwitchCase(spritePointerAssign(1), spritePointerAccessTest(1)),
-                    Expression.SwitchCase(spritePointerAssign(2), spritePointerAccessTest(2)),
-                    Expression.SwitchCase(spritePointerAssign(3), spritePointerAccessTest(3)),
-                    Expression.SwitchCase(spritePointerAssign(4), spritePointerAccessTest(4)),
-                    Expression.SwitchCase(spritePointerAssign(5), spritePointerAccessTest(5)),
-                    Expression.SwitchCase(spritePointerAssign(6), spritePointerAccessTest(6)),
-                    Expression.SwitchCase(spritePointerAssign(7), spritePointerAccessTest(7)),
-                    Expression.SwitchCase(spriteDataAssign(0), spriteDataAccessTests(0)),
-                    Expression.SwitchCase(spriteDataAssign(1), spriteDataAccessTests(1)),
-                    Expression.SwitchCase(spriteDataAssign(2), spriteDataAccessTests(2)),
-                    Expression.SwitchCase(spriteDataAssign(3), spriteDataAccessTests(3)),
-                    Expression.SwitchCase(spriteDataAssign(4), spriteDataAccessTests(4)),
-                    Expression.SwitchCase(spriteDataAssign(5), spriteDataAccessTests(5)),
-                    Expression.SwitchCase(spriteDataAssign(6), spriteDataAccessTests(6)),
-                    Expression.SwitchCase(spriteDataAssign(7), spriteDataAccessTests(7)),
-                    Expression.SwitchCase(graphicsAssign, graphicsAccessTests),
-                    Expression.SwitchCase(colorAssignOnBadline, colorAccessTests),
-                    Expression.SwitchCase(colorClear, colorClearTest),
-                    Expression.SwitchCase(refreshAssign, refreshTests)
-                )));
+            var result = new List<Tuple<Expression, Expression>>();
+
+            result.AddRange(Enumerable.Range(0, 3).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(0 + i * 2), idleAccess)));
+            result.AddRange(Enumerable.Range(0, 3).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(1 + i * 2), noAccess)));
+            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(6 + (i * 4)), spritePointerAssign(i))));
+            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(7 + (i * 4)), spriteDataAssign(i))));
+            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(8 + (i * 4)), spriteDataAssign(i))));
+            result.AddRange(Enumerable.Range(0, 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(9 + (i * 4)), spriteDataAssign(i))));
+            result.AddRange(Enumerable.Range(0, 5).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(38 + (i * 2)), refreshAssign)));
+            result.AddRange(Enumerable.Range(0, 4).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(39 + i * 2), noAccess)));
+            result.AddRange(Enumerable.Range(0, 40).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(47 + (i * 2)), colorAssignOnBadline)));
+            result.AddRange(Enumerable.Range(0, 40).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(48 + (i * 2)), graphicsAssign)));
+            result.Add(new Tuple<Expression, Expression>(_config.MacToCounterX(127), colorClear));
+            result.AddRange(Enumerable.Range(0, (_config.ClocksPerRasterValue - 0x1F8) / 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(127 + (i * 2)), noAccess)));
+            result.AddRange(Enumerable.Range(0, (_config.ClocksPerRasterValue - 0x1F8) / 8).Select(i => new Tuple<Expression, Expression>(_config.MacToCounterX(128 + (i * 2)), idleAccess)));
+
+            return result;
         }
     }
 }

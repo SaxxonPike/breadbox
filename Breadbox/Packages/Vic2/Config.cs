@@ -55,6 +55,20 @@ namespace Breadbox.Packages.Vic2
         public Expression FetchSprite0BaX { get { return Expression.Constant(_fetchSprite0BaX); } }
         public Expression RasterStartX { get { return Expression.Constant(_rasterStartX); } }
 
+        public Expression MacToCounterX(int mac)
+        {
+            var result = _fetchSprite0BaX + (mac * 4);
+            while (result < 0)
+            {
+                result += _clocksPerRaster;
+            }
+            while (result >= _clocksPerRaster)
+            {
+                result -= _clocksPerRaster;
+            }
+            return Expression.Constant(result);
+        }
+
         public Expression RasterXToCounterX(int rasterX)
         {
             while (rasterX < 0)
@@ -72,7 +86,7 @@ namespace Breadbox.Packages.Vic2
                 return Expression.Constant(rasterX);
             }
 
-            return Expression.Constant(rasterX + (512 - _clocksPerRaster));
+            return Expression.Constant(rasterX + (_clocksPerRaster - 512));
         }
 
         public Expression CycleToCounterX(int cycleNumber, bool rising)
