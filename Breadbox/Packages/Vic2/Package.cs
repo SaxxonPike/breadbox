@@ -7,22 +7,20 @@ namespace Breadbox.Packages.Vic2
     {
         private readonly Config _config;
         private readonly State _state;
-        private readonly RasterCounter _rasterCounter;
-        private readonly Mux _mux;
+        private readonly Processor _rasterCounter;
         private readonly VideoBuffer _videoBuffer;
 
         protected Package(Config config)
         {
             _config = config;
             _state = new State(_config);
-            _rasterCounter = new RasterCounter(_state, _config);
-            _mux = new Mux(_state, _config);
+            _rasterCounter = new Processor(_state, _config);
             _videoBuffer = new VideoBuffer(_state.HBLANK, _state.VBLANK, _config.VideoWidth, _config.VideoHeight);
         }
 
         public Expression Clock(Func<Expression, Expression> readMemory, Func<Expression, Expression> readColorMemory, Expression clockPhi1, Expression clockPhi2)
         {
-            return _rasterCounter.Clock(readMemory, readColorMemory, clockPhi1, clockPhi2, _videoBuffer.Write(_mux.OutputColor));
+            return _rasterCounter.Clock(readMemory, readColorMemory, clockPhi1, clockPhi2, _videoBuffer.Write);
         }
 
         public Expression Clock(int clocks, Func<Expression, Expression> readMemory,
