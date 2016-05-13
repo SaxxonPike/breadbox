@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
 
 namespace Breadbox.Packages.Vic2
 {
@@ -49,7 +46,7 @@ namespace Breadbox.Packages.Vic2
                 Expression.Condition(multicolor,
                     Expression.Condition(newMxmc, Expression.Constant(2), Expression.Constant(0)),
                     Expression.Constant(1)));
-            return Util.Invoke(Expression.IfThen(_state.MSREn[spriteNumber], shiftAssign));
+            return Expression.IfThen(_state.MSREn[spriteNumber], shiftAssign);
         }
 
         private Expression GetOutputColor(int spriteNumber)
@@ -66,14 +63,14 @@ namespace Breadbox.Packages.Vic2
                 Expression.SwitchCase(_state.MM0, Expression.Constant(0x400000)),
                 Expression.SwitchCase(foregroundColor, Expression.Constant(0x800000)),
                 Expression.SwitchCase(_state.MM1, Expression.Constant(0xC00000)));
-            return Util.Invoke(Expression.Condition(multiColorSprite, multiColor, singleColor));
+            return Expression.Condition(multiColorSprite, multiColor, singleColor);
         }
 
         private Expression GetOutputData(int spriteNumber)
         {
             var mobData = _state.MDn[spriteNumber];
             var multiColorSprite = _state.MnMC[spriteNumber];
-            return Util.Invoke(Expression.And(mobData, Expression.Condition(multiColorSprite, Expression.Constant(0xC00000), Expression.Constant(0x800000))));
+            return Expression.And(mobData, Expression.Condition(multiColorSprite, Expression.Constant(0xC00000), Expression.Constant(0x800000)));
         }
     }
 }

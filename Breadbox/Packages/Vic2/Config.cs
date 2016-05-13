@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
+﻿using System.Linq.Expressions;
 
 namespace Breadbox.Packages.Vic2
 {
@@ -66,7 +62,7 @@ namespace Breadbox.Packages.Vic2
 
         public Expression MacToCounterX(int mac)
         {
-            var result = _fetchSprite0BaX + (mac * 4);
+            var result = _fetchSprite0BaX + mac * 4;
             while (result < 0)
             {
                 result += _clocksPerRaster;
@@ -100,7 +96,7 @@ namespace Breadbox.Packages.Vic2
 
         public Expression CycleToCounterX(int cycleNumber, bool rising)
         {
-            var result = _rasterStartX + ((cycleNumber - 1)*8) + (rising ? 0 : 4);
+            var result = _rasterStartX + (cycleNumber - 1)*8 + (rising ? 0 : 4);
             while (result < 0)
             {
                 result += _clocksPerRaster;

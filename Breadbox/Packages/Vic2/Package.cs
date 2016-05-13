@@ -1,15 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
 
 namespace Breadbox.Packages.Vic2
 {
     public abstract class Package
     {
         private readonly Config _config;
-        private readonly State _state = new State();
+        private readonly State _state;
         private readonly RasterCounter _rasterCounter;
         private readonly Mux _mux;
         private readonly VideoBuffer _videoBuffer;
@@ -17,6 +14,7 @@ namespace Breadbox.Packages.Vic2
         protected Package(Config config)
         {
             _config = config;
+            _state = new State(_config);
             _rasterCounter = new RasterCounter(_state, _config);
             _mux = new Mux(_state, _config);
             _videoBuffer = new VideoBuffer(_state.HBLANK, _state.VBLANK, _config.VideoWidth, _config.VideoHeight);

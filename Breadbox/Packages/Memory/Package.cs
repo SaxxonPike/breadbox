@@ -12,7 +12,7 @@ namespace Breadbox.Packages.Memory
         protected Package(int addressBits, int dataBits)
         {
             var valueMask = (1 << dataBits) - 1;
-            var capacity = (1 << addressBits);
+            var capacity = 1 << addressBits;
             var addressMask = capacity - 1;
 
             _valueMask = Expression.Constant(valueMask);

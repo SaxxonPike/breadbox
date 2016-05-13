@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 using System.Linq.Expressions;
-using System.Text;
+
 // ReSharper disable InconsistentNaming
 #pragma warning disable 0649
 
@@ -10,6 +8,7 @@ namespace Breadbox.Packages.Vic2
 {
     public class State
     {
+        private readonly Config _config;
         private int _M0X;
         private int _M1X;
         private int _M2X;
@@ -181,7 +180,6 @@ namespace Breadbox.Packages.Vic2
         private int _D39;
         private bool _HBLANK;
         private bool _VBLANK;
-        private int _MAC;
         private int _VMLI;
         private int _MP0;
         private int _MP1;
@@ -225,15 +223,39 @@ namespace Breadbox.Packages.Vic2
         private bool _ADDRESS;
         private bool _BADLINE;
         private bool _BADLINEENABLE;
+        private bool _M0YET;
+        private bool _M1YET;
+        private bool _M2YET;
+        private bool _M3YET;
+        private bool _M4YET;
+        private bool _M5YET;
+        private bool _M6YET;
+        private bool _M7YET;
+        private bool _M0XET;
+        private bool _M1XET;
+        private bool _M2XET;
+        private bool _M3XET;
+        private bool _M4XET;
+        private bool _M5XET;
+        private bool _M6XET;
+        private bool _M7XET;
+        private bool _M0DMA;
+        private bool _M1DMA;
+        private bool _M2DMA;
+        private bool _M3DMA;
+        private bool _M4DMA;
+        private bool _M5DMA;
+        private bool _M6DMA;
+        private bool _M7DMA;
 
-        public State()
+        public State(Config config)
         {
+            _config = config;
             Reset();
         }
 
         public void Reset()
         {
-            _MAC = int.MinValue;
             _VBLANK = true;
             _HBLANK = true;
         }
@@ -387,6 +409,60 @@ namespace Breadbox.Packages.Vic2
                     Util.Member(() => _M5YE),
                     Util.Member(() => _M6YE),
                     Util.Member(() => _M7YE)
+                };
+            }
+        }
+
+        public IList<Expression> MnYET
+        {
+            get
+            {
+                return new Expression[]
+                {
+                    Util.Member(() => _M0YET),
+                    Util.Member(() => _M1YET),
+                    Util.Member(() => _M2YET),
+                    Util.Member(() => _M3YET),
+                    Util.Member(() => _M4YET),
+                    Util.Member(() => _M5YET),
+                    Util.Member(() => _M6YET),
+                    Util.Member(() => _M7YET)
+                };
+            }
+        }
+
+        public IList<Expression> MnXET
+        {
+            get
+            {
+                return new Expression[]
+                {
+                    Util.Member(() => _M0XET),
+                    Util.Member(() => _M1XET),
+                    Util.Member(() => _M2XET),
+                    Util.Member(() => _M3XET),
+                    Util.Member(() => _M4XET),
+                    Util.Member(() => _M5XET),
+                    Util.Member(() => _M6XET),
+                    Util.Member(() => _M7XET)
+                };
+            }
+        }
+
+        public IList<Expression> MnDMA
+        {
+            get
+            {
+                return new Expression[]
+                {
+                    Util.Member(() => _M0DMA),
+                    Util.Member(() => _M1DMA),
+                    Util.Member(() => _M2DMA),
+                    Util.Member(() => _M3DMA),
+                    Util.Member(() => _M4DMA),
+                    Util.Member(() => _M5DMA),
+                    Util.Member(() => _M6DMA),
+                    Util.Member(() => _M7DMA)
                 };
             }
         }
@@ -688,11 +764,6 @@ namespace Breadbox.Packages.Vic2
         public Expression VBLANK
         {
             get { return Util.Member(() => _VBLANK); }
-        }
-
-        public Expression MAC
-        {
-            get { return Util.Member(() => _MAC); }
         }
 
         public Expression VC

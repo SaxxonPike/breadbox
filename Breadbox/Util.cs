@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text;
 
 namespace Breadbox
 {
@@ -185,7 +184,7 @@ namespace Breadbox
                 }
                 else
                 {
-                    newCases.Add(switchCase.Update(switchCase.TestValues.OrderBy(c => ((ConstantExpression)c).Value), switchCase.Body));
+                    newCases.Add(switchCase.Update(switchCase.TestValues.OrderBy(c => ((ConstantExpression)c).Value), Invoke(switchCase.Body)));
                     debugViewCache.Add(switchCaseDebugView);
                 }
             }
