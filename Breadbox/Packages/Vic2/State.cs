@@ -247,6 +247,24 @@ namespace Breadbox.Packages.Vic2
         private bool _M5DMA;
         private bool _M6DMA;
         private bool _M7DMA;
+        private bool _M0DISP;
+        private bool _M1DISP;
+        private bool _M2DISP;
+        private bool _M3DISP;
+        private bool _M4DISP;
+        private bool _M5DISP;
+        private bool _M6DISP;
+        private bool _M7DISP;
+        private bool _M0CRUNCH;
+        private bool _M1CRUNCH;
+        private bool _M2CRUNCH;
+        private bool _M3CRUNCH;
+        private bool _M4CRUNCH;
+        private bool _M5CRUNCH;
+        private bool _M6CRUNCH;
+        private bool _M7CRUNCH;
+        private bool _BORDERM;
+        private bool _BORDERV;
 
         public State(Config config)
         {
@@ -467,6 +485,24 @@ namespace Breadbox.Packages.Vic2
             }
         }
 
+        public IList<Expression> MnDISP
+        {
+            get
+            {
+                return new Expression[]
+                {
+                    Util.Member(() => _M0DISP),
+                    Util.Member(() => _M1DISP),
+                    Util.Member(() => _M2DISP),
+                    Util.Member(() => _M3DISP),
+                    Util.Member(() => _M4DISP),
+                    Util.Member(() => _M5DISP),
+                    Util.Member(() => _M6DISP),
+                    Util.Member(() => _M7DISP)
+                };
+            }
+        }
+
         public Expression VM
         {
             get { return Util.Member(() => _VM); }
@@ -608,6 +644,24 @@ namespace Breadbox.Packages.Vic2
                     Util.Member(() => _M5D),
                     Util.Member(() => _M6D),
                     Util.Member(() => _M7D)
+                };
+            }
+        }
+
+        public IList<Expression> MnCRUNCH
+        {
+            get
+            {
+                return new Expression[]
+                {
+                    Util.Member(() => _M0CRUNCH),
+                    Util.Member(() => _M1CRUNCH),
+                    Util.Member(() => _M2CRUNCH),
+                    Util.Member(() => _M3CRUNCH),
+                    Util.Member(() => _M4CRUNCH),
+                    Util.Member(() => _M5CRUNCH),
+                    Util.Member(() => _M6CRUNCH),
+                    Util.Member(() => _M7CRUNCH)
                 };
             }
         }
@@ -919,6 +973,16 @@ namespace Breadbox.Packages.Vic2
                     Util.Member(() => _MSRE7)
                 };
             }
+        }
+
+        public Expression BORDERM
+        {
+            get { return Util.Member(() => _BORDERM); }
+        }
+
+        public Expression BORDERV
+        {
+            get { return Util.Member(() => _BORDERV); }
         }
     }
 }
