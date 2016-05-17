@@ -8,11 +8,9 @@ type Vic2Configuration(vBlankSet:int, cyclesPerRasterLine:int, rasterLinesPerFra
     member val VBlankClear = (vBlankSet + 28) % rasterLinesPerFrame
     member val RasterLinesPerFrame = rasterLinesPerFrame
     member val RasterOpsX = 0x15C - ((65 - cyclesPerRasterLine) * 8)
+    member val MaxRasterX = System.Math.Min(64, cyclesPerRasterLine) * 8
 
 type Vic2State(config:Vic2Configuration) = 
-    // Constants
-    let bitMasks = [0x01; 0x02; 0x04; 0x08; 0x10; 0x20; 0x40; 0x80]
-
     // MnX (00, 02, 04, 06, 08, 0A, 0C, 0E, 10)
     let mobX = [|0;0;0;0;0;0;0;0|]
     let GetLowMobX (index:int) =
@@ -59,9 +57,6 @@ type Vic2State(config:Vic2Configuration) =
     let SetLowRasterYCompareValue (value:int) =
         rasterYCompareValue <- (rasterYCompareValue &&& 0x100) ||| value
         value
-    let SetHighRasterYCompareValue (value:int) =
-        rasterYCompareValue <- (rasterYCompareValue &&& 0x0FF) ||| ((value &&& 0x80) <<< 1)
-        value
 
     // Control register 1 (11) (RST8/ECM/BMM/DEN/RSEL/YSCROLL)
     let mutable extraColorMode = false
@@ -77,7 +72,7 @@ type Vic2State(config:Vic2Configuration) =
         (if rowSelect then 0x08 else 0x00) |||
         yScroll
     let SetControlRegister1 (value:int) =
-        SetHighRasterYCompareValue(value) |> ignore
+        rasterYCompareValue <- (rasterYCompareValue &&& 0x0FF) ||| ((value &&& 0x80) <<< 1)
         extraColorMode <- (value &&& 0x40 <> 0x00)
         bitmapMode <- (value &&& 0x20 <> 0x00)
         displayEnabled <- (value &&& 0x10 <> 0x00)
@@ -358,19 +353,25 @@ type Vic2State(config:Vic2Configuration) =
 
     // Raster X Counter (for sprites)
     let mutable rasterX = 0
+    let IncrementRasterX () =
+        rasterX <- if rasterX >= (config.MaxRasterX - 1) then 0 else rasterX + 1
 
-
+    // Blanking
     let mutable vBlank = true
     let mutable hBlank = true
+    let ClearVBlank () =
+        vBlank <- false
+    let ClearHBlank () =
+        hBlank <- false
+    let SetVBlank () =
+        vBlank <- true
+    let SetHBlank () =
+        hBlank <- true
 
     // Raster Line Counter (not identical to X)
     let mutable rasterLineCounter = 0
-
     let IncrementRasterLineCounter () =
         rasterLineCounter <- if rasterLineCounter >= (config.CyclesPerRasterLine - 1) then 0 else rasterLineCounter + 1
-        rasterLineCounter
-
-
 
     // RC
     let mutable rowCounter = 0
@@ -386,7 +387,6 @@ type Vic2State(config:Vic2Configuration) =
     let mutable videoCounter = 0
     let mutable videoCounterBase = 0
     let mutable videoMatrixLineIndex = 0
-
     let IncrementVideoCounter () =
         videoCounter <- (videoCounter + 1) &&& 0x3FF
         videoMatrixLineIndex <- (videoMatrixLineIndex + 1) &&& 0x3F
@@ -404,7 +404,6 @@ type Vic2State(config:Vic2Configuration) =
 
     // Display/Idle state
     let mutable displayState = false
-
     let GoToDisplayState () =
         displayState <- true
         displayState
