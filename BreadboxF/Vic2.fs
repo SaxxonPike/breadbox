@@ -1,6 +1,7 @@
 ﻿namespace BreadboxF
 
 type Vic2Configuration(vBlankSet:int, cyclesPerRasterLine:int, rasterLinesPerFrame:int) =
+    let rasterWidth = (cyclesPerRasterLine * 8)
     member val CyclesPerRasterLine = cyclesPerRasterLine
     member val HBlankSet = 0x18C - ((65 - cyclesPerRasterLine) * 8)
     member val HBlankClear = 0x1E8 - (System.Math.Max(0, 64 - cyclesPerRasterLine) * 8)
@@ -8,11 +9,18 @@ type Vic2Configuration(vBlankSet:int, cyclesPerRasterLine:int, rasterLinesPerFra
     member val VBlankClear = (vBlankSet + 28) % rasterLinesPerFrame
     member val RasterLinesPerFrame = rasterLinesPerFrame
     member val RasterOpsX = 0x15C - ((65 - cyclesPerRasterLine) * 8)
-    member val MaxRasterX = System.Math.Min(64, cyclesPerRasterLine) * 8
+    member val RasterWidth = rasterWidth
 
-type Vic2State(config:Vic2Configuration) = 
+type Vic2Chip(config:Vic2Configuration, clockPhi1, clockPhi2) = 
+
+
+    // ========================================================================
+    // Registers
+    // ========================================================================
+
+
     // MnX (00, 02, 04, 06, 08, 0A, 0C, 0E, 10)
-    let mobX = [|0;0;0;0;0;0;0;0|]
+    let mobX = Array.create 8 0
     let GetLowMobX (index:int) =
         mobX.[index] &&& 0xFF
     let GetHighMobX () =
@@ -26,7 +34,6 @@ type Vic2State(config:Vic2Configuration) =
         ((mobX.[7] &&& 0x100) >>> 1)
     let SetLowMobX (index:int, value:int) =
         mobX.[index] <- (mobX.[index] &&& 0x100) ||| value
-        value
     let SetHighMobX (value:int) =
         mobX.[0] <- (mobX.[0] &&& 0x0FF) ||| (if value &&& 0x01 <> 0 then 0x100 else 0x000)
         mobX.[1] <- (mobX.[1] &&& 0x0FF) ||| (if value &&& 0x02 <> 0 then 0x100 else 0x000)
@@ -36,27 +43,23 @@ type Vic2State(config:Vic2Configuration) =
         mobX.[5] <- (mobX.[5] &&& 0x0FF) ||| (if value &&& 0x20 <> 0 then 0x100 else 0x000)
         mobX.[6] <- (mobX.[6] &&& 0x0FF) ||| (if value &&& 0x40 <> 0 then 0x100 else 0x000)
         mobX.[7] <- (mobX.[7] &&& 0x0FF) ||| (if value &&& 0x80 <> 0 then 0x100 else 0x000)
-        value
 
     // MxY (01, 03, 05, 07, 09, 0B, 0D, 0F)
-    let mobY = [|0;0;0;0;0;0;0;0|]
+    let mobY = Array.create 8 0
     let GetMobY (index:int) =
         mobY.[index]
     let SetMobY (index:int, value:int) =
         mobY.[index] <- value
-        value
 
     // RASTER/RST8 (11, 12) (high expects high bit in position 7 as if you wrote to the reg)
     let mutable rasterY = 0
     let mutable rasterYCompareValue = 0
     let IncrementRasterY () =
         rasterY <- if rasterY >= (config.CyclesPerRasterLine - 1) then 0 else (rasterY + 1)
-        rasterY
     let GetLowRasterY () =
         rasterY &&& 0x0FF
     let SetLowRasterYCompareValue (value:int) =
         rasterYCompareValue <- (rasterYCompareValue &&& 0x100) ||| value
-        value
 
     // Control register 1 (11) (RST8/ECM/BMM/DEN/RSEL/YSCROLL)
     let mutable extraColorMode = false
@@ -78,7 +81,6 @@ type Vic2State(config:Vic2Configuration) =
         displayEnabled <- (value &&& 0x10 <> 0x00)
         rowSelect <- (value &&& 0x08 <> 0x00)
         yScroll <- (value &&& 0x07)
-        value
 
     // LPX (13) (it's a 9 bit register but we only keep the upper 8)
     let mutable lightPenX = 0
@@ -86,7 +88,6 @@ type Vic2State(config:Vic2Configuration) =
         lightPenX
     let SetLightPenX (value:int) =
         lightPenX <- value >>> 1
-        value
 
     // LPY (14)
     let mutable lightPenY = 0
@@ -94,10 +95,9 @@ type Vic2State(config:Vic2Configuration) =
         lightPenY
     let SetLightPenY (value:int) =
         lightPenY <- value
-        value
 
     // MnE (15)
-    let mobEnabled = [|false;false;false;false;false;false;false;false|]
+    let mobEnabled = Array.create 8 false
     let GetMobEnable () =
         (if mobEnabled.[0] then 0x01 else 0x00) |||
         (if mobEnabled.[1] then 0x02 else 0x00) |||
@@ -116,7 +116,6 @@ type Vic2State(config:Vic2Configuration) =
         mobEnabled.[5] <- (value &&& 0x20) <> 0
         mobEnabled.[6] <- (value &&& 0x40) <> 0
         mobEnabled.[7] <- (value &&& 0x80) <> 0
-        value
         
     // Control Register 2 (16)
     let mutable res = false
@@ -134,11 +133,10 @@ type Vic2State(config:Vic2Configuration) =
         multiColorMode <- (value &&& 0x10) <> 0x00
         columnSelect <- (value &&& 0x08) <> 0x00
         xScroll <- (value &&& 0x07)
-        value
 
     // Mob Y Expansion (17)
-    let mobYExpansionEnabled = [|false;false;false;false;false;false;false;false|]
-    let mobYExpansionToggle = [|false;false;false;false;false;false;false;false|]
+    let mobYExpansionEnabled = Array.create 8 false
+    let mobYExpansionToggle = Array.create 8 false
     let GetMobYExpansionEnable () =
         (if mobYExpansionEnabled.[0] then 0x01 else 0x00) |||
         (if mobYExpansionEnabled.[1] then 0x02 else 0x00) |||
@@ -157,7 +155,12 @@ type Vic2State(config:Vic2Configuration) =
         mobYExpansionEnabled.[5] <- (value &&& 0x20) <> 0
         mobYExpansionEnabled.[6] <- (value &&& 0x40) <> 0
         mobYExpansionEnabled.[7] <- (value &&& 0x80) <> 0
-        value
+    let SetMobYExpansionToggle (index:int) =
+        mobYExpansionToggle.[index] <- true
+    let ClearMobYExpansionToggle (index:int) =
+        mobYExpansionToggle.[index] <- false
+    let InvertMobYExpansionToggle (index:int) =
+        mobYExpansionToggle.[index] <- not mobYExpansionToggle.[index]
 
     // Memory Pointers (18) (VM and CB are pre-shifted on store for speed)
     let mutable videoMemoryPointer = 0
@@ -169,7 +172,6 @@ type Vic2State(config:Vic2Configuration) =
     let SetMemoryPointers (value:int) =
         videoMemoryPointer <- (value &&& 0xF0) <<< 6
         characterBankPointer <- (value &&& 0x0E) <<< 10
-        value
 
     // Interrupt Register (19) and Interrupt Enable Register (1A)
     let mutable irq = false
@@ -197,13 +199,11 @@ type Vic2State(config:Vic2Configuration) =
         mobMobCollisionIrq <- (mobMobCollisionIrq && ((value &&& 0x04) = 0))
         mobBackgroundCollisionIrq <- (mobBackgroundCollisionIrq && ((value &&& 0x02) = 0))
         rasterIrq <- (rasterIrq && ((value &&& 0x01) = 0))
-        value
     let SetInterruptEnable (value:int) =
         lightPenIrqEnabled <- (value &&& 0x08) <> 0
         mobMobCollisionIrqEnabled <- (value &&& 0x04) <> 0
         mobBackgroundCollisionIrq <- (value &&& 0x02) <> 0
         rasterIrqEnabled <- (value &&& 0x01) <> 0
-        value
     let UpdateIrq () =
         irq <- (lightPenIrq && lightPenIrqEnabled) ||
             (mobMobCollisionIrq && mobMobCollisionIrqEnabled) ||
@@ -211,7 +211,7 @@ type Vic2State(config:Vic2Configuration) =
             (rasterIrq && rasterIrqEnabled)
 
     // Sprite Data Priority (1B)
-    let mobDataPriority = [|false;false;false;false;false;false;false;false|]
+    let mobDataPriority = Array.create 8 false
     let GetMobDataPriority () =
         (if mobDataPriority.[0] then 0x01 else 0x00) |||
         (if mobDataPriority.[1] then 0x02 else 0x00) |||
@@ -230,11 +230,10 @@ type Vic2State(config:Vic2Configuration) =
         mobDataPriority.[5] <- (value &&& 0x20) <> 0
         mobDataPriority.[6] <- (value &&& 0x40) <> 0
         mobDataPriority.[7] <- (value &&& 0x80) <> 0
-        value
 
     // Sprite Multicolor Enable (1C)
-    let mobMultiColorEnabled = [|false;false;false;false;false;false;false;false|]
-    let mobMultiColorToggle = [|false;false;false;false;false;false;false;false|]
+    let mobMultiColorEnabled = Array.create 8 false
+    let mobMultiColorToggle = Array.create 8 false
     let GetMobMultiColorEnable () =
         (if mobMultiColorEnabled.[0] then 0x01 else 0x00) |||
         (if mobMultiColorEnabled.[1] then 0x02 else 0x00) |||
@@ -253,11 +252,10 @@ type Vic2State(config:Vic2Configuration) =
         mobMultiColorEnabled.[5] <- (value &&& 0x20) <> 0
         mobMultiColorEnabled.[6] <- (value &&& 0x40) <> 0
         mobMultiColorEnabled.[7] <- (value &&& 0x80) <> 0
-        value
     
     // Sprite X Expansion Enable (1D)
-    let mobXExpansionEnabled = [|false;false;false;false;false;false;false;false|]
-    let mobXExpansionToggle = [|false;false;false;false;false;false;false;false|]
+    let mobXExpansionEnabled = Array.create 8 false
+    let mobXExpansionToggle = Array.create 8 false
     let GetMobXExpansionEnable () =
         (if mobXExpansionEnabled.[0] then 0x01 else 0x00) |||
         (if mobXExpansionEnabled.[1] then 0x02 else 0x00) |||
@@ -276,10 +274,15 @@ type Vic2State(config:Vic2Configuration) =
         mobXExpansionEnabled.[5] <- (value &&& 0x20) <> 0
         mobXExpansionEnabled.[6] <- (value &&& 0x40) <> 0
         mobXExpansionEnabled.[7] <- (value &&& 0x80) <> 0
-        value
+    let SetMobXExpansionToggle (index:int) =
+        mobXExpansionToggle.[index] <- true
+    let ClearMobXExpansionToggle (index:int) =
+        mobXExpansionToggle.[index] <- false
+    let InvertMobXExpansionToggle (index:int) =
+        mobXExpansionToggle.[index] <- not mobXExpansionToggle.[index]
 
     // Sprite-sprite Collision (1E)
-    let mobMobCollision = [|false;false;false;false;false;false;false;false|]
+    let mobMobCollision = Array.create 8 false
     let GetMobMobCollision () =
         (if mobMobCollision.[0] then 0x01 else 0x00) |||
         (if mobMobCollision.[1] then 0x02 else 0x00) |||
@@ -289,7 +292,8 @@ type Vic2State(config:Vic2Configuration) =
         (if mobMobCollision.[5] then 0x20 else 0x00) |||
         (if mobMobCollision.[6] then 0x40 else 0x00) |||
         (if mobMobCollision.[7] then 0x80 else 0x00)
-    let ClearMobMobCollision () =
+    let ClearAndGetMobMobCollision () =
+        let oldValue = GetMobMobCollision()
         mobMobCollision.[0] <- false
         mobMobCollision.[1] <- false
         mobMobCollision.[2] <- false
@@ -298,10 +302,10 @@ type Vic2State(config:Vic2Configuration) =
         mobMobCollision.[5] <- false
         mobMobCollision.[6] <- false
         mobMobCollision.[7] <- false
-        0
+        oldValue
 
     // Sprite-background Collision (1F)
-    let mobDataCollision = [|false;false;false;false;false;false;false;false|]
+    let mobDataCollision = Array.create 8 false
     let GetMobDataCollision () =
         (if mobDataCollision.[0] then 0x01 else 0x00) |||
         (if mobDataCollision.[1] then 0x02 else 0x00) |||
@@ -311,7 +315,8 @@ type Vic2State(config:Vic2Configuration) =
         (if mobDataCollision.[5] then 0x20 else 0x00) |||
         (if mobDataCollision.[6] then 0x40 else 0x00) |||
         (if mobDataCollision.[7] then 0x80 else 0x00)
-    let ClearMobDataCollision () =
+    let ClearAndGetMobDataCollision () =
+        let oldValue = GetMobDataCollision()
         mobDataCollision.[0] <- false
         mobDataCollision.[1] <- false
         mobDataCollision.[2] <- false
@@ -320,7 +325,7 @@ type Vic2State(config:Vic2Configuration) =
         mobDataCollision.[5] <- false
         mobDataCollision.[6] <- false
         mobDataCollision.[7] <- false
-        0
+        oldValue
 
     // Border Color (20)
     let mutable borderColor = 0
@@ -328,35 +333,36 @@ type Vic2State(config:Vic2Configuration) =
         borderColor ||| 0xF0
     let SetBorderColor (value:int) =
         borderColor <- value &&& 0x0F
-        value
 
     // Background Colors (21, 22, 23, 24)
-    let backgroundColor = [|0;0;0;0|]
+    let backgroundColor = Array.create 4 0
     let GetBackgroundColor (index:int) =
         backgroundColor.[index] ||| 0xF0
     let SetBackgroundColor (index:int, value:int) =
         backgroundColor.[index] <- value &&& 0x0F
 
     // Sprite Multicolors (25, 26)
-    let mobMultiColor = [|0;0|]
+    let mobMultiColor = Array.create 2 0
     let GetMobMultiColor (index:int) =
         mobMultiColor.[index] ||| 0xF0
     let SetMobMultiColor (index:int, value:int) =
         mobMultiColor.[index] <- value &&& 0x0F
 
     // Sprite Colors (27, 28, 29, 2A, 2B, 2C, 2D, 2E)
-    let mobColor = [|0;0;0;0;0;0;0;0|]
+    let mobColor = Array.create 8 0
     let GetMobColor (index:int) =
         mobColor.[index] ||| 0xF0
     let SetMobColor (index:int, value:int) =
         mobColor.[index] <- value &&& 0x0F
 
-    // Raster X Counter (for sprites)
-    let mutable rasterX = 0
-    let IncrementRasterX () =
-        rasterX <- if rasterX >= (config.MaxRasterX - 1) then 0 else rasterX + 1
+
+    // ========================================================================
+    // Internals
+    // ========================================================================
+
 
     // Blanking
+    // - The circuitry outputs black when blanked, so there's no need to render pixels.
     let mutable vBlank = true
     let mutable hBlank = true
     let ClearVBlank () =
@@ -368,10 +374,56 @@ type Vic2State(config:Vic2Configuration) =
     let SetHBlank () =
         hBlank <- true
 
-    // Raster Line Counter (not identical to X)
+    // Raster Line Counter
+    // - This determines the Raster X position as well as all horizontal timed operations.
+    let rasterX = Array.init (config.RasterWidth) (fun counter ->
+        if (config.RasterWidth <= 0x200 || counter <= 0x18C) then
+            counter
+        else
+            let extraCycles = config.RasterWidth - 0x200
+            let adjustedCycle = counter - extraCycles
+            if (adjustedCycle < 0x18C) then
+                0x18C
+            else
+                adjustedCycle
+        )
+
     let mutable rasterLineCounter = 0
     let IncrementRasterLineCounter () =
         rasterLineCounter <- if rasterLineCounter >= (config.CyclesPerRasterLine - 1) then 0 else rasterLineCounter + 1
+    let GetRasterX () =
+        rasterX.[rasterLineCounter]
+
+    // Clocks
+    let IsPhi0 () =
+        rasterLineCounter &&& 0x4 <> 0
+    let IsPhi1 () =
+        rasterLineCounter &&& 0x4 = 0
+
+    // Memory Access Cycles (BA for sprite 0 begins the sequence)
+    // - This determines which memory accesses need to happen.
+    //   0  First sprite BA
+    //   6  First sprite fetch
+    //  38  First R fetch
+    //  40  Character BA
+    //  46  Last R fetch
+    //  47  First C fetch
+    //  48  First G fetch
+    // 125  Last C fetch
+    // 126  Last G fetch (NOTE: this overlaps 0 on PAL systems)
+    let memoryAccessCycle = Array.init (config.RasterWidth) (fun counter ->
+        if (counter % 4 <> 0) then
+            -1
+        else
+            (((config.RasterWidth + config.RasterOpsX) - counter) % config.RasterWidth) / 4
+        )
+    let GetMemoryAccessCycleForScreenCycle (cycle:int) =
+        if (cycle < 55) then
+            (cycle * 2) + 12
+        else
+            (((cycle - config.CyclesPerRasterLine) * 2) + 126) % (config.CyclesPerRasterLine * 2)
+    let GetMemoryAccessCycle () =
+        memoryAccessCycle.[rasterLineCounter]
 
     // RC
     let mutable rowCounter = 0
@@ -402,6 +454,14 @@ type Vic2State(config:Vic2Configuration) =
         videoCounterBase <- 0
         0
 
+    // MC, MCBASE, MDMA, MSRE, MDC
+    let mobCounter = Array.create 8 0
+    let mobCounterBase = Array.create 8 0
+    let mobDma = Array.create 8 false
+    let mobShiftRegisterEnable = Array.create 8 false
+    let mobDataCrunch = Array.create 8 false
+
+
     // Display/Idle state
     let mutable displayState = false
     let GoToDisplayState () =
@@ -411,6 +471,189 @@ type Vic2State(config:Vic2Configuration) =
         displayState <- false
         displayState
 
+    // Bad lines
+    let mutable badLinesEnabled = false
+    let mutable badLine = false
 
+    // AEC and BA
+    let mutable aec = false
+    let mutable ba = false
+    let mutable baCounter = 24
+    let IsSpriteBa (counter:int, index:int) =
+        let lowerBound = index * 4
+        let upperBound = lowerBound + 10
+        counter >= lowerBound && counter < upperBound && mobDma.[index]
+    let IsAnySpriteBa (counter:int) =
+        IsSpriteBa(counter, 0) ||
+        IsSpriteBa(counter, 1) ||
+        IsSpriteBa(counter, 2) ||
+        IsSpriteBa(counter, 3) ||
+        IsSpriteBa(counter, 4) ||
+        IsSpriteBa(counter, 5) ||
+        IsSpriteBa(counter, 6) ||
+        IsSpriteBa(counter, 7)
+    let IsBadLineBa (counter:int) =
+        badLine && counter >= 40 && counter < 126
+    let GetBa () =
+        let counter = GetMemoryAccessCycle()
+        if counter = -1 then
+            ba
+        else
+            not (IsBadLineBa(counter) || IsAnySpriteBa(counter))
+    let UpdateBaAndAec () =
+        ba <- GetBa()
+        baCounter <-
+            if ba then
+                24
+            else
+                if (baCounter > 0) then
+                    baCounter - 1
+                else
+                    0
+        aec <- baCounter > 0 && IsPhi0()
+
+    // Helpful decodes
+    let cycle01MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(1)
+    let cycle02MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(2)
+    let cycle14MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(14)
+    let cycle15MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(15)
+    let cycle16MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(16)
+    let cycle55MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(55)
+    let cycle56MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(56)
+    let cycle58MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(58)
+    let cycle63MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(63)
+
+
+    // ========================================================================
+    // Process
+    // ========================================================================
+
+
+    let Clock () =
+        IncrementRasterLineCounter()
+
+
+
+    // ========================================================================
+    // Interface
+    // ========================================================================
+
+
+    // Register Access
+    member this.PeekRegister (address:int) =
+        match (address &&& 0x3F) with
+            | 0x00 -> GetLowMobX(0)
+            | 0x01 -> GetMobY(0)
+            | 0x02 -> GetLowMobX(1)
+            | 0x03 -> GetMobY(1)
+            | 0x04 -> GetLowMobX(2)
+            | 0x05 -> GetMobY(2)
+            | 0x06 -> GetLowMobX(3)
+            | 0x07 -> GetMobY(3)
+            | 0x08 -> GetLowMobX(4)
+            | 0x09 -> GetMobY(4)
+            | 0x0A -> GetLowMobX(5)
+            | 0x0B -> GetMobY(5)
+            | 0x0C -> GetLowMobX(6)
+            | 0x0D -> GetMobY(6)
+            | 0x0E -> GetLowMobX(7)
+            | 0x0F -> GetMobY(7)
+            | 0x10 -> GetHighMobX()
+            | 0x11 -> GetControlRegister1()
+            | 0x12 -> GetLowRasterY()
+            | 0x13 -> GetLightPenX()
+            | 0x14 -> GetLightPenY()
+            | 0x15 -> GetMobEnable()
+            | 0x16 -> GetControlRegister2()
+            | 0x17 -> GetMobYExpansionEnable()
+            | 0x18 -> GetMemoryPointers()
+            | 0x19 -> GetInterruptRegister()
+            | 0x1A -> GetInterruptEnable()
+            | 0x1B -> GetMobDataPriority()
+            | 0x1C -> GetMobMultiColorEnable()
+            | 0x1D -> GetMobXExpansionEnable()
+            | 0x1E -> GetMobMobCollision()
+            | 0x1F -> GetMobDataCollision()
+            | 0x20 -> GetBorderColor()
+            | 0x21 -> GetBackgroundColor(0)
+            | 0x22 -> GetBackgroundColor(1)
+            | 0x23 -> GetBackgroundColor(2)
+            | 0x24 -> GetBackgroundColor(3)
+            | 0x25 -> GetMobMultiColor(0)
+            | 0x26 -> GetMobMultiColor(1)
+            | 0x27 -> GetMobColor(0)
+            | 0x28 -> GetMobColor(1)
+            | 0x29 -> GetMobColor(2)
+            | 0x2A -> GetMobColor(3)
+            | 0x2B -> GetMobColor(4)
+            | 0x2C -> GetMobColor(5)
+            | 0x2D -> GetMobColor(6)
+            | 0x2E -> GetMobColor(7)
+            | _ -> 0xFF
+
+    member this.PokeRegister (address:int, value:int) =
+        match (address &&& 0x3F) with
+            | 0x00 -> SetLowMobX(0, value)
+            | 0x01 -> SetMobY(0, value)
+            | 0x02 -> SetLowMobX(1, value)
+            | 0x03 -> SetMobY(1, value)
+            | 0x04 -> SetLowMobX(2, value)
+            | 0x05 -> SetMobY(2, value)
+            | 0x06 -> SetLowMobX(3, value)
+            | 0x07 -> SetMobY(3, value)
+            | 0x08 -> SetLowMobX(4, value)
+            | 0x09 -> SetMobY(4, value)
+            | 0x0A -> SetLowMobX(5, value)
+            | 0x0B -> SetMobY(5, value)
+            | 0x0C -> SetLowMobX(6, value)
+            | 0x0D -> SetMobY(6, value)
+            | 0x0E -> SetLowMobX(7, value)
+            | 0x0F -> SetMobY(7, value)
+            | 0x10 -> SetHighMobX(value)
+            | 0x11 -> SetControlRegister1(value)
+            | 0x12 -> SetLowRasterYCompareValue(value)
+            | 0x15 -> SetMobEnable(value)
+            | 0x16 -> SetControlRegister2(value)
+            | 0x17 -> SetMobYExpansionEnable(value)
+            | 0x18 -> SetMemoryPointers(value)
+            | 0x19 -> SetInterruptRegister(value)
+            | 0x1A -> SetInterruptEnable(value)
+            | 0x1B -> SetMobDataPriority(value)
+            | 0x1C -> SetMobMultiColorEnable(value)
+            | 0x1D -> SetMobXExpansionEnable(value)
+            | 0x20 -> SetBorderColor(value)
+            | 0x21 -> SetBackgroundColor(0, value)
+            | 0x22 -> SetBackgroundColor(1, value)
+            | 0x23 -> SetBackgroundColor(2, value)
+            | 0x24 -> SetBackgroundColor(3, value)
+            | 0x25 -> SetMobMultiColor(0, value)
+            | 0x26 -> SetMobMultiColor(1, value)
+            | 0x27 -> SetMobColor(0, value)
+            | 0x28 -> SetMobColor(1, value)
+            | 0x29 -> SetMobColor(2, value)
+            | 0x2A -> SetMobColor(3, value)
+            | 0x2B -> SetMobColor(4, value)
+            | 0x2C -> SetMobColor(5, value)
+            | 0x2D -> SetMobColor(6, value)
+            | 0x2E -> SetMobColor(7, value)
+            | _ -> ()
+
+    member this.ReadRegister(address:int) =
+        match (address &&& 0x3F) with
+            | 0x1E -> ClearAndGetMobMobCollision()
+            | 0x1F -> ClearAndGetMobDataCollision()
+            | _ -> this.PeekRegister(address)
+
+    member this.WriteRegister(address:int, value:int) =
+        match (address &&& 0x3F) with
+            | 0x13 | 0x14 | 0x1E | 0x1F -> ()
+            | _ -> this.PokeRegister(address, value)
+
+    member this.OutputIrq = not irq
+    member this.OutputBa = ba
+    member this.OutputAec = aec
+    member this.OutputPhi1 = IsPhi1()
+    member this.OutputPhi2 = IsPhi0()
+    
 
 
