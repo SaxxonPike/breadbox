@@ -472,10 +472,8 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
     let mutable displayState = false
     let GoToDisplayState () =
         displayState <- true
-        displayState
     let GoToIdleState () =
         displayState <- false
-        displayState
 
     // Refresh counter
     let mutable refreshCounter = 0
@@ -523,18 +521,6 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
                     0
         aec <- baCounter > 0 && IsPhi0()
 
-    // Helpful decodes
-    let newRasterMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(1)
-    let rasterCompareMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(1)
-    let lateRasterCompareMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(2)
-    let endOfRasterLineMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(config.CyclesPerRasterLine)
-    let reloadVideoCounterMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(14)
-    let spriteCrunchMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(15)
-    let mobCounterIncrementMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(16)
-    let updateMobDmaMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(55)
-    let updateYExpansionToggleMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(55)
-    let reloadMobCounterMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(58)
-
 
     // ========================================================================
     // Internal Units
@@ -542,8 +528,95 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
 
 
     // Raster Counter
+    // (PAL cycle to MAC table)
+    // 55: 0   G-   63: 16  SS  8:  32  SS  16: 48  GC  24: 64  GC  32: 80  GC  40: 96  GC  48: 112 GC
+    // 56: 2   I-   1:  18  PS  9:  34  PS  17: 50  GC  25: 66  GC  33: 82  GC  41: 98  GC  49: 114 GC
+    // 57: 4   I-   2:  20  SS  10: 36  SS  18: 52  GC  26: 68  GC  34: 84  GC  42: 100 GC  50: 116 GC
+    // 58: 6   PS   3:  22  PS  11: 38  R-  19: 54  GC  27: 70  GC  35: 86  GC  43: 102 GC  51: 118 GC
+    // 59: 8   SS   4:  24  SS  12: 40  R-  20: 56  GC  28: 72  GC  36: 88  GC  44: 104 GC  52: 120 GC
+    // 60: 10  PS   5:  26  PS  13: 42  R-  21: 58  GC  29: 74  GC  37: 90  GC  45: 106 GC  53: 122 GC
+    // 61: 12  SS   6:  28  SS  14: 44  R-  22: 60  GC  30: 76  GC  38: 92  GC  46: 108 GC  54: 124 GC
+    // 62: 14  PS   7:  30  PS  15: 46  RC  23: 62  GC  31: 78  GC  39: 94  GC  47: 110 GC
     let ClockRasterCounter () =
+        let mac = GetMemoryAccessCycle()
         IncrementRasterLineCounter()
+        match GetMemoryAccessCycle() with
+            | 0 | 2 ->
+                // cycle 55-56
+                if mac = 0 then
+                    let toggleExpansionIfEnabled (index:int) =
+                        mobYExpansionToggle.[index] <- mobYExpansionToggle.[index] <> mobYExpansionEnabled.[index]
+                    toggleExpansionIfEnabled(0)
+                    toggleExpansionIfEnabled(1)
+                    toggleExpansionIfEnabled(2)
+                    toggleExpansionIfEnabled(3)
+                    toggleExpansionIfEnabled(4)
+                    toggleExpansionIfEnabled(5)
+                    toggleExpansionIfEnabled(6)
+                    toggleExpansionIfEnabled(7)
+                let checkSpriteEnable (index:int) =
+                    if mobEnabled.[index] && (mobY.[index] &&& 0x7) = (rasterY &&& 0x7) then
+                        if not mobDma.[index] then
+                            mobDma.[index] <- true
+                            mobCounterBase.[index] <- 0
+                            mobYExpansionToggle.[index] <- mobYExpansionToggle.[index] && (not mobYExpansionEnabled.[index])
+                checkSpriteEnable(0)
+                checkSpriteEnable(1)
+                checkSpriteEnable(2)
+                checkSpriteEnable(3)
+                checkSpriteEnable(4)
+                checkSpriteEnable(5)
+                checkSpriteEnable(6)
+                checkSpriteEnable(7)
+            | 6 ->
+                // cycle 58
+                if rowCounter = 7 then
+                    GoToIdleState()
+                    videoCounterBase <- videoCounter
+                if displayState then
+                    IncrementRowCounter()
+                let reloadMobCounter (index:int) =
+                    mobShiftRegisterEnable.[index] <- false
+                    mobCounter.[index] <- mobCounterBase.[index]
+                    if mobDma.[index] then
+                        if (mobY.[index] &&& 0x7) = (rasterY &&& 0x7) then
+                            mobDisplay.[index] <- true
+                    else
+                        mobDisplay.[index] <- false
+                reloadMobCounter(0)
+                reloadMobCounter(1)
+                reloadMobCounter(2)
+                reloadMobCounter(3)
+                reloadMobCounter(4)
+                reloadMobCounter(5)
+                reloadMobCounter(6)
+                reloadMobCounter(7)
+            | 44 ->
+                // cycle 14
+                videoCounter <- videoCounterBase
+                videoMatrixLineIndex <- 0
+                if badLine then
+                    rowCounter <- 0
+            | 48 ->
+                // cycle 16
+                let checkSpriteCrunch (index:int) =
+                    if mobYExpansionToggle.[index] then
+                        mobCounterBase.[index] <-
+                            if mobDataCrunch.[index] then
+                                (0x2A &&& (mobCounterBase.[index] &&& mobCounter.[index])) ||| (0x15 &&& (mobCounterBase.[index] ||| mobCounter.[index]))
+                            else
+                                mobCounter.[index]
+                        if mobCounterBase.[index] = 63 then
+                            mobDma.[index] <- false
+                checkSpriteCrunch(0)
+                checkSpriteCrunch(1)
+                checkSpriteCrunch(2)
+                checkSpriteCrunch(3)
+                checkSpriteCrunch(4)
+                checkSpriteCrunch(5)
+                checkSpriteCrunch(6)
+                checkSpriteCrunch(7)
+            | _ -> ()
 
     // Memory Interface, Address Generator, Refresh Counter
     let ClockMemoryInterface () =
@@ -578,8 +651,8 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
         let readI () =
             readMemory(0x3FFF) |> ignore
         let readR () =
-            readMemory(0x3F00 ||| refreshCounter) |> ignore
             DecrementRefreshCounter()
+            readMemory(0x3F00 ||| refreshCounter) |> ignore
         match GetMemoryAccessCycle() with
             |  0 -> if (config.CyclesPerRasterLine < 64) then readG() else readI()
             |  2 |  4 -> readI()
@@ -626,6 +699,24 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
                     if (x < 128) then
                         readC()
 
+    let ClockBaAec() =
+        UpdateBaAndAec()
+
+    let ClockIrq() =
+        UpdateIrq()
+
+    let ClockSprite (index:int) =
+        if mobDisplay.[index] then
+            if mobShiftRegisterEnable.[index] then
+                if mobXExpansionToggle.[index] then
+                    if mobMultiColorToggle.[index] then
+                        mobShiftRegister.[index] = mobShiftRegister.[index] <<< if mobMultiColorEnabled.[index] then 2 else 1
+                    mobMultiColorToggle.[index] <- (not mobMultiColorEnabled.[index]) || (mobMultiColorToggle.[index] <> mobMultiColorEnabled.[index])
+                mobXExpansionToggle.[index] <- (not mobXExpansionEnabled.[index]) || (mobXExpansionToggle.[index] <> mobXExpansionEnabled.[index])
+            else
+            
+        
+
     // ========================================================================
     // Process
     // ========================================================================
@@ -633,10 +724,11 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
 
     let Clock () =
         ClockRasterCounter()
+        ClockBaAec()
         ClockMemoryInterface()
+        ClockIrq()
 
         // *** TODO ***
-
 
 
     // ========================================================================
