@@ -11,7 +11,7 @@ type Vic2Configuration(vBlankSet:int, cyclesPerRasterLine:int, rasterLinesPerFra
     member val RasterOpsX = 0x15C - ((65 - cyclesPerRasterLine) * 8)
     member val RasterWidth = rasterWidth
 
-type Vic2Chip(config:Vic2Configuration, clockPhi1, clockPhi2) = 
+type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) = 
 
 
     // ========================================================================
@@ -430,37 +430,43 @@ type Vic2Chip(config:Vic2Configuration, clockPhi1, clockPhi2) =
 
     let IncrementRowCounter () =
         rowCounter <- (rowCounter + 1) &&& 0x7
-        rowCounter
     let ResetRowCounter () =
         rowCounter <- 0
-        0
 
-    // VC, VCBASE, VMLI
+    // VC, VCBASE, VMLI, VMLM
     let mutable videoCounter = 0
     let mutable videoCounterBase = 0
     let mutable videoMatrixLineIndex = 0
+    let videoMatrixLineMemory = Array.create 40 0
     let IncrementVideoCounter () =
         videoCounter <- (videoCounter + 1) &&& 0x3FF
         videoMatrixLineIndex <- (videoMatrixLineIndex + 1) &&& 0x3F
-        videoMatrixLineIndex
     let IncrementVideoCounterBase () =
         videoCounterBase <- videoCounter
-        videoCounterBase
     let ResetVideoCounter () =
         videoCounter <- videoCounterBase
         videoMatrixLineIndex <- 0
-        0
     let ResetVideoCounterBase () =
         videoCounterBase <- 0
-        0
+    let GetVideoMatrixLineMemory () =
+        if videoMatrixLineIndex < 40 then videoMatrixLineMemory.[videoMatrixLineIndex] else 0
+    let SetVideoMatrixLineMemory (value:int) =
+        if videoMatrixLineIndex < 40 then videoMatrixLineMemory.[videoMatrixLineIndex] <- value
 
-    // MC, MCBASE, MDMA, MSRE, MDC
+    // Graphics shift registers
+    let mutable graphicsShiftRegister = 0
+
+    // MC, MCBASE, MDMA, MDC, MP
     let mobCounter = Array.create 8 0
     let mobCounterBase = Array.create 8 0
     let mobDma = Array.create 8 false
-    let mobShiftRegisterEnable = Array.create 8 false
     let mobDataCrunch = Array.create 8 false
+    let mobPointer = Array.create 8 0
+    let mobDisplay = Array.create 8 false
 
+    // Sprite shift registers
+    let mobShiftRegister = Array.create 8 0
+    let mobShiftRegisterEnable = Array.create 8 false
 
     // Display/Idle state
     let mutable displayState = false
@@ -470,6 +476,11 @@ type Vic2Chip(config:Vic2Configuration, clockPhi1, clockPhi2) =
     let GoToIdleState () =
         displayState <- false
         displayState
+
+    // Refresh counter
+    let mutable refreshCounter = 0
+    let DecrementRefreshCounter () =
+        refreshCounter <- (refreshCounter - 1) &&& 0xFF
 
     // Bad lines
     let mutable badLinesEnabled = false
@@ -513,16 +524,107 @@ type Vic2Chip(config:Vic2Configuration, clockPhi1, clockPhi2) =
         aec <- baCounter > 0 && IsPhi0()
 
     // Helpful decodes
-    let cycle01MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(1)
-    let cycle02MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(2)
-    let cycle14MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(14)
-    let cycle15MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(15)
-    let cycle16MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(16)
-    let cycle55MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(55)
-    let cycle56MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(56)
-    let cycle58MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(58)
-    let cycle63MemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(63)
+    let newRasterMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(1)
+    let rasterCompareMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(1)
+    let lateRasterCompareMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(2)
+    let endOfRasterLineMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(config.CyclesPerRasterLine)
+    let reloadVideoCounterMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(14)
+    let spriteCrunchMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(15)
+    let mobCounterIncrementMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(16)
+    let updateMobDmaMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(55)
+    let updateYExpansionToggleMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(55)
+    let reloadMobCounterMemoryAccessCycle = GetMemoryAccessCycleForScreenCycle(58)
 
+
+    // ========================================================================
+    // Internal Units
+    // ========================================================================
+
+
+    // Raster Counter
+    let ClockRasterCounter () =
+        IncrementRasterLineCounter()
+
+    // Memory Interface, Address Generator, Refresh Counter
+    let ClockMemoryInterface () =
+        let readP (index:int) =
+            mobPointer.[index] <- (readMemory(videoMemoryPointer ||| 0x3F8 ||| index) &&& 0xFF) <<< 6
+        let readS (index:int, counter:int) =
+            if mobDma.[index] then
+                mobShiftRegister.[index] <- (mobShiftRegister.[index] <<< 8) ||| (readMemory(mobCounter.[index] ||| mobPointer.[index]) &&& 0xFF)
+                mobCounter.[index] <- mobCounter.[index] + 1
+            else
+                if counter = 1 then
+                    readMemory(0x3FFF) |> ignore
+        let readC () =
+            if badLine then
+                SetVideoMatrixLineMemory(readMemory(videoMemoryPointer ||| videoCounter))
+            else
+                readMemory(0x3FFF) |> ignore
+        let readG () =
+            let data =
+                readMemory((if extraColorMode then 0x39FF else 0x3FFF) &&&
+                    if (displayState) then
+                        if (bitmapMode) then
+                            (characterBankPointer &&& 0x2000) ||| (videoCounter <<< 3) ||| rowCounter
+                        else
+                            characterBankPointer ||| (GetVideoMatrixLineMemory() &&& 0xFF) ||| rowCounter
+                    else
+                        SetVideoMatrixLineMemory(0)
+                        0x3FFF
+                )
+            graphicsShiftRegister <- (graphicsShiftRegister <<< 8) ||| (data &&& 0xFF)
+            IncrementVideoCounter()
+        let readI () =
+            readMemory(0x3FFF) |> ignore
+        let readR () =
+            readMemory(0x3F00 ||| refreshCounter) |> ignore
+            DecrementRefreshCounter()
+        match GetMemoryAccessCycle() with
+            |  0 -> if (config.CyclesPerRasterLine < 64) then readG() else readI()
+            |  2 |  4 -> readI()
+            |  6 -> readP(0)
+            |  7 -> readS(0, 0)
+            |  8 -> readS(0, 1)
+            |  9 -> readS(0, 2)
+            | 10 -> readP(1)
+            | 11 -> readS(1, 0)
+            | 12 -> readS(1, 1)
+            | 13 -> readS(1, 2)
+            | 14 -> readP(2)
+            | 15 -> readS(2, 0)
+            | 16 -> readS(2, 1)
+            | 17 -> readS(2, 2)
+            | 18 -> readP(3)
+            | 19 -> readS(3, 0)
+            | 20 -> readS(3, 1)
+            | 21 -> readS(3, 2)
+            | 22 -> readP(4)
+            | 23 -> readS(4, 0)
+            | 24 -> readS(4, 1)
+            | 25 -> readS(4, 2)
+            | 26 -> readP(5)
+            | 27 -> readS(5, 0)
+            | 28 -> readS(5, 1)
+            | 29 -> readS(5, 2)
+            | 30 -> readP(6)
+            | 31 -> readS(6, 0)
+            | 32 -> readS(6, 1)
+            | 33 -> readS(6, 2)
+            | 34 -> readP(7)
+            | 35 -> readS(7, 0)
+            | 36 -> readS(7, 1)
+            | 37 -> readS(7, 2)
+            | 38 | 40 | 42 | 44 | 46 -> readR()
+            | x ->
+                if (x &&& 1 = 0) then
+                    if (x < 128) then
+                        readG()
+                    else
+                        readI()
+                else
+                    if (x < 128) then
+                        readC()
 
     // ========================================================================
     // Process
@@ -530,7 +632,10 @@ type Vic2Chip(config:Vic2Configuration, clockPhi1, clockPhi2) =
 
 
     let Clock () =
-        IncrementRasterLineCounter()
+        ClockRasterCounter()
+        ClockMemoryInterface()
+
+        // *** TODO ***
 
 
 

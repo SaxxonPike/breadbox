@@ -13,7 +13,7 @@ namespace Breadbox.Test.BreadboxF
         [Test]
         public void Test1()
         {
-            var v2 = new Vic2Configuration(13, 65, 263);
+            var config = new Vic2Configuration(13, 65, 263);
         }
     }
 }
