@@ -282,6 +282,7 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
         mobXExpansionToggle.[index] <- not mobXExpansionToggle.[index]
 
     // Sprite-sprite Collision (1E)
+    let mutable mobMobFirstCollidedIndex = -1
     let mobMobCollision = Array.create 8 false
     let GetMobMobCollision () =
         (if mobMobCollision.[0] then 0x01 else 0x00) |||
@@ -302,9 +303,11 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
         mobMobCollision.[5] <- false
         mobMobCollision.[6] <- false
         mobMobCollision.[7] <- false
+        mobMobFirstCollidedIndex <- -1
         oldValue
 
     // Sprite-background Collision (1F)
+    let mobDataCollisionOccurred = false
     let mobDataCollision = Array.create 8 false
     let GetMobDataCollision () =
         (if mobDataCollision.[0] then 0x01 else 0x00) |||
@@ -455,6 +458,13 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
 
     // Graphics shift registers
     let mutable graphicsShiftRegister = 0
+    let mutable graphicsShiftRegisterColor = 0
+    let mutable graphicsShiftRegisterOutput = 0
+    let mutable graphicsShiftRegisterMultiColorToggle = false
+    let mutable graphicsReadC = 0
+    let mutable graphicsReadG = 0
+    let mutable graphicsPendingC = 0
+    let mutable graphicsPendingG = 0
 
     // MC, MCBASE, MDMA, MDC, MP
     let mobCounter = Array.create 8 0
@@ -467,6 +477,7 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
     // Sprite shift registers
     let mobShiftRegister = Array.create 8 0
     let mobShiftRegisterEnable = Array.create 8 false
+    let mobShiftRegisterOutput = Array.create 8 0
 
     // Display/Idle state
     let mutable displayState = false
@@ -521,6 +532,11 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
                     0
         aec <- baCounter > 0 && IsPhi0()
 
+    // Border Unit
+    let mutable borderVerticalEnabled = false
+    let mutable borderMainEnabled = false
+    let mutable borderEnableDelay = 0
+
 
     // ========================================================================
     // Internal Units
@@ -540,7 +556,8 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
     let ClockRasterCounter () =
         let mac = GetMemoryAccessCycle()
         IncrementRasterLineCounter()
-        match GetMemoryAccessCycle() with
+
+        match mac with
             | 0 | 2 ->
                 // cycle 55-56
                 if mac = 0 then
@@ -631,11 +648,12 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
                     readMemory(0x3FFF) |> ignore
         let readC () =
             if badLine then
-                SetVideoMatrixLineMemory(readMemory(videoMemoryPointer ||| videoCounter))
+                graphicsReadC <- readMemory(videoMemoryPointer ||| videoCounter)
+                SetVideoMatrixLineMemory(graphicsReadC)
             else
                 readMemory(0x3FFF) |> ignore
         let readG () =
-            let data =
+            graphicsReadG <-
                 readMemory((if extraColorMode then 0x39FF else 0x3FFF) &&&
                     if (displayState) then
                         if (bitmapMode) then
@@ -643,10 +661,8 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
                         else
                             characterBankPointer ||| (GetVideoMatrixLineMemory() &&& 0xFF) ||| rowCounter
                     else
-                        SetVideoMatrixLineMemory(0)
                         0x3FFF
-                )
-            graphicsShiftRegister <- (graphicsShiftRegister <<< 8) ||| (data &&& 0xFF)
+                ) &&& 0xFF
             IncrementVideoCounter()
         let readI () =
             readMemory(0x3FFF) |> ignore
@@ -654,6 +670,7 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
             DecrementRefreshCounter()
             readMemory(0x3F00 ||| refreshCounter) |> ignore
         match GetMemoryAccessCycle() with
+            | -1 -> ()
             |  0 -> if (config.CyclesPerRasterLine < 64) then readG() else readI()
             |  2 |  4 -> readI()
             |  6 -> readP(0)
@@ -691,12 +708,12 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
             | 38 | 40 | 42 | 44 | 46 -> readR()
             | x ->
                 if (x &&& 1 = 0) then
-                    if (x < 128) then
+                    if (x >= 48 && x < 128) then
                         readG()
                     else
                         readI()
                 else
-                    if (x < 128) then
+                    if (x >= 47 && x < 127) then
                         readC()
 
     let ClockBaAec() =
@@ -706,14 +723,78 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
         UpdateIrq()
 
     let ClockSprite (index:int) =
-        if mobDisplay.[index] then
+        let display = mobDisplay.[index]
+        let rasterX = GetRasterX()
+        let multiColor = mobMultiColorEnabled.[index]
+        let expandX = mobXExpansionEnabled.[index]
+        let mobX = mobX.[index]
+        if display then
+            if not mobShiftRegisterEnable.[index] then
+                if mobX = rasterX then
+                    mobShiftRegisterEnable.[index] <- true
             if mobShiftRegisterEnable.[index] then
                 if mobXExpansionToggle.[index] then
                     if mobMultiColorToggle.[index] then
-                        mobShiftRegister.[index] = mobShiftRegister.[index] <<< if mobMultiColorEnabled.[index] then 2 else 1
-                    mobMultiColorToggle.[index] <- (not mobMultiColorEnabled.[index]) || (mobMultiColorToggle.[index] <> mobMultiColorEnabled.[index])
-                mobXExpansionToggle.[index] <- (not mobXExpansionEnabled.[index]) || (mobXExpansionToggle.[index] <> mobXExpansionEnabled.[index])
+                        mobShiftRegisterOutput.[index] <- (if multiColor then 0xC00000 else 0x800000)
+                        mobShiftRegister.[index] <- mobShiftRegister.[index] <<< (if multiColor then 2 else 1)
+                    mobMultiColorToggle.[index] <- (not multiColor) || (mobMultiColorToggle.[index] <> multiColor)
+                mobXExpansionToggle.[index] <- (not expandX) || (mobXExpansionToggle.[index] <> expandX)
+
+    let ClockSprites () =
+        ClockSprite(0)
+        ClockSprite(1)
+        ClockSprite(2)
+        ClockSprite(3)
+        ClockSprite(4)
+        ClockSprite(5)
+        ClockSprite(6)
+        ClockSprite(7)
+
+    let ClockGraphics () =
+        graphicsShiftRegisterMultiColorToggle <- not graphicsShiftRegisterMultiColorToggle
+        let mac = GetMemoryAccessCycle()
+        if (mac >= 0) && (mac &&& 1 = 1) then
+            graphicsPendingC <- graphicsReadC
+            graphicsPendingG <- graphicsReadG
+            graphicsReadC <- 0
+            graphicsReadG <- 0
+        if xScroll = (GetRasterX() &&& 0x7) then
+            graphicsShiftRegister <- graphicsPendingG
+            graphicsShiftRegisterColor <- graphicsPendingC
+            graphicsShiftRegisterMultiColorToggle <- false
+        let multiColor =
+            multiColorMode && (bitmapMode || (graphicsShiftRegisterColor &&& 0x800 <> 0))
+        if (not multiColor) || graphicsShiftRegisterMultiColorToggle then
+            graphicsShiftRegisterOutput <- graphicsShiftRegister &&& (if multiColor then 0xC0 else 0x80)
+            graphicsShiftRegister <- graphicsShiftRegister <<< (if multiColor then 2 else 1)
+
+    let ClockBorder () =
+        borderEnableDelay <- (borderEnableDelay <<< 1) ||| (if borderMainEnabled || borderVerticalEnabled then 1 else 0)
+
+    let ClockPixel () =
+        let outputForSprite(index:int) =
+            match mobShiftRegisterOutput.[index] with
+                | 0x000000 -> -1
+                | bits ->
+                    if mobMobFirstCollidedIndex = -1 then
+                        mobMobFirstCollidedIndex <- index
+                    else
+                        mobMobCollision.[index] <- true
+                        mobMobCollision.[mobMobFirstCollidedIndex] <- true
+                        mobMobCollisionIrq <- true
+                    match bits with
+                        | 0x400000 -> mobMultiColor.[0]
+                        | 0x800000 -> mobColor.[index]
+                        | 0xC00000 -> mobMultiColor.[1]
+        let outputForGraphics =
+            if extraColorMode && (bitmapMode || multiColorMode) then
+                0
             else
+                match graphicsShiftRegisterOutput with
+                    | 0x00 -> 
+
+            
+            
             
         
 
@@ -726,9 +807,10 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
         ClockRasterCounter()
         ClockBaAec()
         ClockMemoryInterface()
+        ClockSprites()
+        ClockGraphics()
+        ClockPixel()
         ClockIrq()
-
-        // *** TODO ***
 
 
     // ========================================================================
