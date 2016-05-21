@@ -11,7 +11,22 @@ type CommodoreVic2Configuration(vBlankSet:int, cyclesPerRasterLine:int, rasterLi
     member val RasterOpsX = 0x15C - ((65 - cyclesPerRasterLine) * 8)
     member val RasterWidth = rasterWidth
 
-type CommodoreVic2Chip(config:CommodoreVic2Configuration, readBus:System.Func<int, int>, writeVideo:System.Action<int, bool>, clockPhi1, clockPhi2) = 
+type CommodoreVic2MemoryInterface =
+    abstract member Read: int -> int
+    abstract member Write: int * int -> unit
+
+type CommodoreVic2VideoOutput(pixel:int, blank:bool) =
+    let Pixel = pixel
+    let Blank = blank
+
+type CommodoreVic2VideoInterface =
+    abstract member Output: CommodoreVic2VideoOutput -> unit
+
+type CommodoreVic2ClockInterface =
+    abstract member ClockPhi1: unit
+    abstract member ClockPhi2: unit
+
+type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2MemoryInterface, video:CommodoreVic2VideoInterface, clock:CommodoreVic2ClockInterface) = 
 
 
     // ========================================================================
@@ -616,23 +631,23 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, readBus:System.Func<in
     // Memory Interface, Address Generator, Refresh Counter
     let ClockMemoryInterface (mac:int) =
         let readP (index:int) =
-            mobPointer.[index] <- (readBus.Invoke(videoMemoryPointer ||| 0x3F8 ||| index) &&& 0xFF) <<< 6
+            mobPointer.[index] <- (memory.Read(videoMemoryPointer ||| 0x3F8 ||| index) &&& 0xFF) <<< 6
         let readS (index:int, counter:int) =
             if mobDma.[index] then
-                mobShiftRegister.[index] <- (mobShiftRegister.[index] <<< 8) ||| (readBus.Invoke(mobCounter.[index] ||| mobPointer.[index]) &&& 0xFF)
+                mobShiftRegister.[index] <- (mobShiftRegister.[index] <<< 8) ||| (memory.Read(mobCounter.[index] ||| mobPointer.[index]) &&& 0xFF)
                 mobCounter.[index] <- mobCounter.[index] + 1
             else
                 if counter = 1 then
-                    readBus.Invoke(0x3FFF) |> ignore
+                    memory.Read(0x3FFF) |> ignore
         let readC () =
             if badLine then
-                graphicsReadC <- readBus.Invoke(videoMemoryPointer ||| videoCounter)
+                graphicsReadC <- memory.Read(videoMemoryPointer ||| videoCounter)
                 SetVideoMatrixLineMemory(graphicsReadC)
             else
-                readBus.Invoke(0x3FFF) |> ignore
+                memory.Read(0x3FFF) |> ignore
         let readG () =
             graphicsReadG <-
-                readBus.Invoke((if extraColorMode then 0x39FF else 0x3FFF) &&&
+                memory.Read((if extraColorMode then 0x39FF else 0x3FFF) &&&
                     if (displayState) then
                         if (bitmapMode) then
                             (characterBankPointer &&& 0x2000) ||| (videoCounter <<< 3) ||| rowCounter
@@ -643,10 +658,10 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, readBus:System.Func<in
                 ) &&& 0xFF
             IncrementVideoCounter()
         let readI () =
-            readBus.Invoke(0x3FFF) |> ignore
+            memory.Read(0x3FFF) |> ignore
         let readR () =
             DecrementRefreshCounter()
-            readBus.Invoke(0x3F00 ||| refreshCounter) |> ignore
+            memory.Read(0x3F00 ||| refreshCounter) |> ignore
         match mac with
             | -1 -> ()
             |  0 -> if (config.CyclesPerRasterLine < 64) then readG() else readI()
@@ -870,7 +885,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, readBus:System.Func<in
         ClockMemoryInterface(mac)
         ClockSprites(rasterX)
         ClockGraphics(mac, rasterX)
-        writeVideo.Invoke(ClockPixel(), hBlank || vBlank)
+        video.Output(new CommodoreVic2VideoOutput(ClockPixel(), hBlank || vBlank))
         ClockIrq()
 
     member this.ClockFrame () =
@@ -1001,5 +1016,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, readBus:System.Func<in
     member this.OutputPhi1 = IsPhi1()
     member this.OutputPhi2 = IsPhi0()
     
-
+    member this.RasterLineCounter = rasterLineCounter
+    member this.RasterX = GetRasterX()
+    member this.RasterY = rasterY
+    member this.RasterYCompareValue = rasterYCompareValue
 
