@@ -44,7 +44,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Vic2.fs" />
+    <Compile Include="CommodoreVic2.fs" />
+    <Compile Include="Commodore64SystemRam.fs" />
+    <Compile Include="Commodore64ColorRam.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

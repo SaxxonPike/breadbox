@@ -1,6 +1,6 @@
 ﻿namespace BreadboxF
 
-type Vic2Configuration(vBlankSet:int, cyclesPerRasterLine:int, rasterLinesPerFrame:int) =
+type CommodoreVic2Configuration(vBlankSet:int, cyclesPerRasterLine:int, rasterLinesPerFrame:int) =
     let rasterWidth = (cyclesPerRasterLine * 8)
     member val CyclesPerRasterLine = cyclesPerRasterLine
     member val HBlankSet = 0x18C - ((65 - cyclesPerRasterLine) * 8)
@@ -11,7 +11,7 @@ type Vic2Configuration(vBlankSet:int, cyclesPerRasterLine:int, rasterLinesPerFra
     member val RasterOpsX = 0x15C - ((65 - cyclesPerRasterLine) * 8)
     member val RasterWidth = rasterWidth
 
-type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) = 
+type CommodoreVic2Chip(config:CommodoreVic2Configuration, readBus:System.Func<int, int>, writeVideo:System.Action<int, bool>, clockPhi1, clockPhi2) = 
 
 
     // ========================================================================
@@ -283,6 +283,7 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
 
     // Sprite-sprite Collision (1E)
     let mutable mobMobFirstCollidedIndex = -1
+    let mutable mobMobCollisionOccurred = false
     let mobMobCollision = Array.create 8 false
     let GetMobMobCollision () =
         (if mobMobCollision.[0] then 0x01 else 0x00) |||
@@ -418,13 +419,8 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
         if (counter % 4 <> 0) then
             -1
         else
-            (((config.RasterWidth + config.RasterOpsX) - counter) % config.RasterWidth) / 4
+            (((config.RasterWidth - config.RasterOpsX) + counter) % config.RasterWidth) / 4
         )
-    let GetMemoryAccessCycleForScreenCycle (cycle:int) =
-        if (cycle < 55) then
-            (cycle * 2) + 12
-        else
-            (((cycle - config.CyclesPerRasterLine) * 2) + 126) % (config.CyclesPerRasterLine * 2)
     let GetMemoryAccessCycle () =
         memoryAccessCycle.[rasterLineCounter]
 
@@ -514,28 +510,13 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
         IsSpriteBa(counter, 7)
     let IsBadLineBa (counter:int) =
         badLine && counter >= 40 && counter < 126
-    let GetBa () =
-        let counter = GetMemoryAccessCycle()
-        if counter = -1 then
-            ba
-        else
-            not (IsBadLineBa(counter) || IsAnySpriteBa(counter))
-    let UpdateBaAndAec () =
-        ba <- GetBa()
-        baCounter <-
-            if ba then
-                24
-            else
-                if (baCounter > 0) then
-                    baCounter - 1
-                else
-                    0
-        aec <- baCounter > 0 && IsPhi0()
 
     // Border Unit
     let mutable borderVerticalEnabled = false
     let mutable borderMainEnabled = false
     let mutable borderEnableDelay = 0
+    let GetBorderOutput () =
+        (borderEnableDelay &&& 0x100 = 1)
 
 
     // ========================================================================
@@ -553,10 +534,7 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
     // 60: 10  PS   5:  26  PS  13: 42  R-  21: 58  GC  29: 74  GC  37: 90  GC  45: 106 GC  53: 122 GC
     // 61: 12  SS   6:  28  SS  14: 44  R-  22: 60  GC  30: 76  GC  38: 92  GC  46: 108 GC  54: 124 GC
     // 62: 14  PS   7:  30  PS  15: 46  RC  23: 62  GC  31: 78  GC  39: 94  GC  47: 110 GC
-    let ClockRasterCounter () =
-        let mac = GetMemoryAccessCycle()
-        IncrementRasterLineCounter()
-
+    let ClockRasterCounter (mac:int) =
         match mac with
             | 0 | 2 ->
                 // cycle 55-56
@@ -636,25 +614,25 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
             | _ -> ()
 
     // Memory Interface, Address Generator, Refresh Counter
-    let ClockMemoryInterface () =
+    let ClockMemoryInterface (mac:int) =
         let readP (index:int) =
-            mobPointer.[index] <- (readMemory(videoMemoryPointer ||| 0x3F8 ||| index) &&& 0xFF) <<< 6
+            mobPointer.[index] <- (readBus.Invoke(videoMemoryPointer ||| 0x3F8 ||| index) &&& 0xFF) <<< 6
         let readS (index:int, counter:int) =
             if mobDma.[index] then
-                mobShiftRegister.[index] <- (mobShiftRegister.[index] <<< 8) ||| (readMemory(mobCounter.[index] ||| mobPointer.[index]) &&& 0xFF)
+                mobShiftRegister.[index] <- (mobShiftRegister.[index] <<< 8) ||| (readBus.Invoke(mobCounter.[index] ||| mobPointer.[index]) &&& 0xFF)
                 mobCounter.[index] <- mobCounter.[index] + 1
             else
                 if counter = 1 then
-                    readMemory(0x3FFF) |> ignore
+                    readBus.Invoke(0x3FFF) |> ignore
         let readC () =
             if badLine then
-                graphicsReadC <- readMemory(videoMemoryPointer ||| videoCounter)
+                graphicsReadC <- readBus.Invoke(videoMemoryPointer ||| videoCounter)
                 SetVideoMatrixLineMemory(graphicsReadC)
             else
-                readMemory(0x3FFF) |> ignore
+                readBus.Invoke(0x3FFF) |> ignore
         let readG () =
             graphicsReadG <-
-                readMemory((if extraColorMode then 0x39FF else 0x3FFF) &&&
+                readBus.Invoke((if extraColorMode then 0x39FF else 0x3FFF) &&&
                     if (displayState) then
                         if (bitmapMode) then
                             (characterBankPointer &&& 0x2000) ||| (videoCounter <<< 3) ||| rowCounter
@@ -665,11 +643,11 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
                 ) &&& 0xFF
             IncrementVideoCounter()
         let readI () =
-            readMemory(0x3FFF) |> ignore
+            readBus.Invoke(0x3FFF) |> ignore
         let readR () =
             DecrementRefreshCounter()
-            readMemory(0x3F00 ||| refreshCounter) |> ignore
-        match GetMemoryAccessCycle() with
+            readBus.Invoke(0x3F00 ||| refreshCounter) |> ignore
+        match mac with
             | -1 -> ()
             |  0 -> if (config.CyclesPerRasterLine < 64) then readG() else readI()
             |  2 |  4 -> readI()
@@ -716,15 +694,27 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
                     if (x >= 47 && x < 127) then
                         readC()
 
-    let ClockBaAec() =
-        UpdateBaAndAec()
+    let ClockBaAec(mac:int) =
+        ba <-
+            if mac = -1 then
+                ba
+            else
+                not (IsBadLineBa(mac) || IsAnySpriteBa(mac))
+        baCounter <-
+            if ba then
+                24
+            else
+                if (baCounter > 0) then
+                    baCounter - 1
+                else
+                    0
+        aec <- baCounter > 0 && IsPhi0()
 
     let ClockIrq() =
         UpdateIrq()
 
-    let ClockSprite (index:int) =
+    let ClockSprite (index:int, rasterX:int) =
         let display = mobDisplay.[index]
-        let rasterX = GetRasterX()
         let multiColor = mobMultiColorEnabled.[index]
         let expandX = mobXExpansionEnabled.[index]
         let mobX = mobX.[index]
@@ -740,25 +730,24 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
                     mobMultiColorToggle.[index] <- (not multiColor) || (mobMultiColorToggle.[index] <> multiColor)
                 mobXExpansionToggle.[index] <- (not expandX) || (mobXExpansionToggle.[index] <> expandX)
 
-    let ClockSprites () =
-        ClockSprite(0)
-        ClockSprite(1)
-        ClockSprite(2)
-        ClockSprite(3)
-        ClockSprite(4)
-        ClockSprite(5)
-        ClockSprite(6)
-        ClockSprite(7)
+    let ClockSprites (rasterX:int) =
+        ClockSprite(0, rasterX)
+        ClockSprite(1, rasterX)
+        ClockSprite(2, rasterX)
+        ClockSprite(3, rasterX)
+        ClockSprite(4, rasterX)
+        ClockSprite(5, rasterX)
+        ClockSprite(6, rasterX)
+        ClockSprite(7, rasterX)
 
-    let ClockGraphics () =
+    let ClockGraphics (mac:int, rasterX:int) =
         graphicsShiftRegisterMultiColorToggle <- not graphicsShiftRegisterMultiColorToggle
-        let mac = GetMemoryAccessCycle()
         if (mac >= 0) && (mac &&& 1 = 1) then
             graphicsPendingC <- graphicsReadC
             graphicsPendingG <- graphicsReadG
             graphicsReadC <- 0
             graphicsReadG <- 0
-        if xScroll = (GetRasterX() &&& 0x7) then
+        if xScroll = (rasterX &&& 0x7) then
             graphicsShiftRegister <- graphicsPendingG
             graphicsShiftRegisterColor <- graphicsPendingC
             graphicsShiftRegisterMultiColorToggle <- false
@@ -772,6 +761,7 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
         borderEnableDelay <- (borderEnableDelay <<< 1) ||| (if borderMainEnabled || borderVerticalEnabled then 1 else 0)
 
     let ClockPixel () =
+        mobMobFirstCollidedIndex <- -1
         let outputForSprite(index:int) =
             match mobShiftRegisterOutput.[index] with
                 | 0x000000 -> -1
@@ -781,36 +771,113 @@ type Vic2Chip(config:Vic2Configuration, readMemory, clockPhi1, clockPhi2) =
                     else
                         mobMobCollision.[index] <- true
                         mobMobCollision.[mobMobFirstCollidedIndex] <- true
-                        mobMobCollisionIrq <- true
+                        if not mobMobCollisionOccurred then
+                            mobMobCollisionIrq <- true
+                            mobMobCollisionOccurred <- true
+                    if (not borderVerticalEnabled) && (graphicsShiftRegisterOutput >= 0x80) then
+                        mobDataCollision.[index] <- true
                     match bits with
                         | 0x400000 -> mobMultiColor.[0]
-                        | 0x800000 -> mobColor.[index]
                         | 0xC00000 -> mobMultiColor.[1]
-        let outputForGraphics =
-            if extraColorMode && (bitmapMode || multiColorMode) then
-                0
-            else
-                match graphicsShiftRegisterOutput with
-                    | 0x00 -> 
-
-            
-            
-            
+                        | _ -> mobColor.[index]
         
+        let spriteOutput0 = outputForSprite(0)
+        let spriteOutput1 = outputForSprite(1)
+        let spriteOutput2 = outputForSprite(2)
+        let spriteOutput3 = outputForSprite(3)
+        let spriteOutput4 = outputForSprite(4)
+        let spriteOutput5 = outputForSprite(5)
+        let spriteOutput6 = outputForSprite(6)
+        let spriteOutput7 = outputForSprite(7)
+
+        if GetBorderOutput() then
+            borderColor
+        else
+            let graphicsOutput =
+                if (extraColorMode && (bitmapMode || multiColorMode)) then
+                    0
+                else
+                    match graphicsShiftRegisterOutput with
+                        | 0x40 ->
+                            if bitmapMode then
+                                (graphicsShiftRegisterColor >>> 4) &&& 0x00F
+                            else
+                                backgroundColor.[1]
+                        | 0x80 ->
+                            if bitmapMode then
+                                if multiColorMode then
+                                    graphicsShiftRegisterColor &&& 0x00F
+                                else
+                                    (graphicsShiftRegisterColor >>> 4) &&& 0x00F
+                            else
+                                if multiColorMode then
+                                    backgroundColor.[2]
+                                else
+                                    (graphicsShiftRegisterColor >>> 8) &&& 0x00F
+                        | 0xC0 ->
+                            (graphicsShiftRegisterColor >>> 8) &&& (if bitmapMode then 0x00F else 0x007)
+                        | _ ->
+                            if extraColorMode then
+                                backgroundColor.[(graphicsShiftRegisterColor >>> 6) &&& 0x003]
+                            else
+                                if bitmapMode && not multiColorMode then
+                                    graphicsShiftRegisterColor &&& 0x00F
+                                else
+                                    backgroundColor.[0]
+            let spriteOutput =
+                if spriteOutput0 = -1 then
+                    if spriteOutput1 = -1 then
+                        if spriteOutput2 = -1 then
+                            if spriteOutput3 = -1 then
+                                if spriteOutput4 = -1 then
+                                    if spriteOutput5 = -1 then
+                                        if spriteOutput6 = -1 then
+                                            spriteOutput7
+                                        else
+                                            spriteOutput6
+                                    else
+                                        spriteOutput5
+                                else
+                                    spriteOutput4
+                            else
+                                spriteOutput3
+                        else
+                            spriteOutput2
+                    else
+                        spriteOutput1
+                else
+                    spriteOutput0
+            if mobMobFirstCollidedIndex >= 0 then
+                if (graphicsShiftRegisterOutput >= 0x80) || (not mobDataPriority.[mobMobFirstCollidedIndex]) then
+                    spriteOutput
+                else
+                    graphicsOutput
+            else
+                graphicsOutput
 
     // ========================================================================
     // Process
     // ========================================================================
 
 
-    let Clock () =
-        ClockRasterCounter()
-        ClockBaAec()
-        ClockMemoryInterface()
-        ClockSprites()
-        ClockGraphics()
-        ClockPixel()
+    member this.Clock () =
+        IncrementRasterLineCounter()
+        let mac = GetMemoryAccessCycle()
+        let rasterX = GetRasterX()
+
+        ClockRasterCounter(mac)
+        ClockBaAec(mac)
+        ClockMemoryInterface(mac)
+        ClockSprites(rasterX)
+        ClockGraphics(mac, rasterX)
+        writeVideo.Invoke(ClockPixel(), hBlank || vBlank)
         ClockIrq()
+
+    member this.ClockFrame () =
+        let mutable i = config.RasterWidth * config.RasterLinesPerFrame
+        while i > 0 do
+            this.Clock()
+            i <- i - 1
 
 
     // ========================================================================
