@@ -2,14 +2,16 @@
 
 type CommodoreVic2Configuration(vBlankSet:int, cyclesPerRasterLine:int, rasterLinesPerFrame:int) =
     let rasterWidth = (cyclesPerRasterLine * 8)
+    let hBlankClear = 0x1E8 - (System.Math.Max(0, 64 - cyclesPerRasterLine) * 8)
     member val CyclesPerRasterLine = cyclesPerRasterLine
     member val HBlankSet = 0x18C - ((65 - cyclesPerRasterLine) * 8)
-    member val HBlankClear = 0x1E8 - (System.Math.Max(0, 64 - cyclesPerRasterLine) * 8)
+    member val HBlankClear = hBlankClear
     member val VBlankSet = vBlankSet
     member val VBlankClear = (vBlankSet + 28) % rasterLinesPerFrame
     member val RasterLinesPerFrame = rasterLinesPerFrame
     member val RasterOpsX = 0x15C - ((65 - cyclesPerRasterLine) * 8)
     member val RasterWidth = rasterWidth
+    member val RasterIncrement = hBlankClear - 0x04C
 
 type CommodoreVic2MemoryInterface =
     abstract member Read: int -> int
@@ -23,8 +25,8 @@ type CommodoreVic2VideoInterface =
     abstract member Output: CommodoreVic2VideoOutput -> unit
 
 type CommodoreVic2ClockInterface =
-    abstract member ClockPhi1: unit
-    abstract member ClockPhi2: unit
+    abstract member ClockPhi1: unit -> unit
+    abstract member ClockPhi2: unit -> unit
 
 type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2MemoryInterface, video:CommodoreVic2VideoInterface, clock:CommodoreVic2ClockInterface) = 
 
@@ -48,7 +50,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         ((mobX.[6] &&& 0x100) >>> 2) |||
         ((mobX.[7] &&& 0x100) >>> 1)
     let SetLowMobX (index:int, value:int) =
-        mobX.[index] <- (mobX.[index] &&& 0x100) ||| value
+        mobX.[index] <- (mobX.[index] &&& 0x100) ||| (value &&& 0xFF)
     let SetHighMobX (value:int) =
         mobX.[0] <- (mobX.[0] &&& 0x0FF) ||| (if value &&& 0x01 <> 0 then 0x100 else 0x000)
         mobX.[1] <- (mobX.[1] &&& 0x0FF) ||| (if value &&& 0x02 <> 0 then 0x100 else 0x000)
@@ -64,13 +66,13 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     let GetMobY (index:int) =
         mobY.[index]
     let SetMobY (index:int, value:int) =
-        mobY.[index] <- value
+        mobY.[index] <- value &&& 0xFF
 
     // RASTER/RST8 (11, 12) (high expects high bit in position 7 as if you wrote to the reg)
     let mutable rasterY = 0
     let mutable rasterYCompareValue = 0
     let IncrementRasterY () =
-        rasterY <- if rasterY >= (config.CyclesPerRasterLine - 1) then 0 else (rasterY + 1)
+        rasterY <- if rasterY >= (config.RasterLinesPerFrame - 1) then 0 else (rasterY + 1)
     let GetLowRasterY () =
         rasterY &&& 0x0FF
     let SetLowRasterYCompareValue (value:int) =
@@ -407,9 +409,9 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
                 adjustedCycle
         )
 
-    let mutable rasterLineCounter = 0
+    let mutable rasterLineCounter = config.RasterIncrement
     let IncrementRasterLineCounter () =
-        rasterLineCounter <- if rasterLineCounter >= (config.CyclesPerRasterLine - 1) then 0 else rasterLineCounter + 1
+        rasterLineCounter <- if rasterLineCounter >= (config.RasterWidth - 1) then 0 else rasterLineCounter + 1
     let GetRasterX () =
         rasterX.[rasterLineCounter]
 
@@ -550,6 +552,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     // 61: 12  SS   6:  28  SS  14: 44  R-  22: 60  GC  30: 76  GC  38: 92  GC  46: 108 GC  54: 124 GC
     // 62: 14  PS   7:  30  PS  15: 46  RC  23: 62  GC  31: 78  GC  39: 94  GC  47: 110 GC
     let ClockRasterCounter (mac:int) =
+        if rasterLineCounter = config.RasterIncrement then
+            IncrementRasterY()
         match mac with
             | 0 | 2 ->
                 // cycle 55-56
@@ -730,14 +734,13 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
 
     let ClockSprite (index:int, rasterX:int) =
         let display = mobDisplay.[index]
-        let multiColor = mobMultiColorEnabled.[index]
-        let expandX = mobXExpansionEnabled.[index]
-        let mobX = mobX.[index]
         if display then
+            let expandX = mobXExpansionEnabled.[index]
             if not mobShiftRegisterEnable.[index] then
-                if mobX = rasterX then
+                if mobX.[index] = rasterX then
                     mobShiftRegisterEnable.[index] <- true
             if mobShiftRegisterEnable.[index] then
+                let multiColor = mobMultiColorEnabled.[index]
                 if mobXExpansionToggle.[index] then
                     if mobMultiColorToggle.[index] then
                         mobShiftRegisterOutput.[index] <- (if multiColor then 0xC00000 else 0x800000)
@@ -888,11 +891,19 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         video.Output(new CommodoreVic2VideoOutput(ClockPixel(), hBlank || vBlank))
         ClockIrq()
 
-    member this.ClockFrame () =
-        let mutable i = config.RasterWidth * config.RasterLinesPerFrame
+        match (rasterLineCounter &&& 0x7) with
+            | 0 -> clock.ClockPhi1()
+            | 4 -> clock.ClockPhi2()
+            | _ -> ()
+
+    member this.ClockMultiple (count:int) =
+        let mutable i = count
         while i > 0 do
             this.Clock()
             i <- i - 1
+
+    member this.ClockFrame () =
+        this.ClockMultiple(config.RasterWidth * config.RasterLinesPerFrame)
 
 
     // ========================================================================
@@ -1020,4 +1031,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     member this.RasterX = GetRasterX()
     member this.RasterY = rasterY
     member this.RasterYCompareValue = rasterYCompareValue
+    member this.SpriteX(index:int) = mobX.[index]
+    member this.SpriteY(index:int) = mobY.[index]
+    member this.SpriteEnabled(index:int) = mobEnabled.[index]
 

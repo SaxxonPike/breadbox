@@ -55,10 +55,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BreadboxF\Vic2.cs" />
-    <Compile Include="Packages\Vic2Tests.cs" />
+    <Compile Include="Vic2\Vic2BaseTestFixture.cs" />
+    <Compile Include="Vic2\Vic2RasterCounterTests.cs" />
+    <Compile Include="Vic2\Vic2RegisterTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Any.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
