@@ -11,11 +11,7 @@ namespace Breadbox.Test.Vic2
     {
         protected override CommodoreVic2Configuration Config
         {
-            get
-            {
-                // config doesn't matter for these; we're using new NTSC here
-                return new CommodoreVic2Configuration(13, 65, 263);
-            }
+            get { return new CommodoreVic2ConfigurationFactory().Create6567R8Configuration(); }
         }
 
         private void TestSpriteRegister(int register, int value, Func<int, bool> test)
@@ -95,6 +91,7 @@ namespace Breadbox.Test.Vic2
             // Arrange
             const int register = 0x11;
             var expectedValue = value & 0x7F;
+            Vic.Clock();
 
             // Act
             Vic.WriteRegister(register, value);
@@ -122,6 +119,7 @@ namespace Breadbox.Test.Vic2
             // Arrange
             const int register = 0x11;
             var expectedValue = ((rasterLine%263) & 0x100) != 0;
+            Vic.Clock();
 
             // Act
             Vic.ClockMultiple(rasterLine * Config.RasterWidth);
@@ -160,6 +158,7 @@ namespace Breadbox.Test.Vic2
             // Arrange
             const int register = 0x12;
             var expectedValue = (rasterLine%263) & 0xFF;
+            Vic.Clock();
 
             // Act
             Vic.ClockMultiple(rasterLine * Config.RasterWidth);

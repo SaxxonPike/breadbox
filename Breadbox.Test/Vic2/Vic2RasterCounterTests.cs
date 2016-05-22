@@ -9,18 +9,15 @@ namespace Breadbox.Test.Vic2
     {
         protected override CommodoreVic2Configuration Config
         {
-            get
-            {
-                // config doesn't matter for these; we're using new NTSC here
-                return new CommodoreVic2Configuration(13, 65, 263);
-            }
+            get { return new CommodoreVic2ConfigurationFactory().Create6567R8Configuration(); }
+
         }
 
         [Test]
         public void RasterLineCounter_AdvancesPerClock()
         {
             // Arrange
-            var expectedValue = Config.RasterIncrement + 1;
+            var expectedValue = Config.RasterIncrement;
 
             // Act
             Vic.Clock();
@@ -33,13 +30,27 @@ namespace Breadbox.Test.Vic2
         public void RasterLineCounter_ClocksCorrectNumberOfPixelsPerLine()
         {
             // Arrange
-            var expectedValue = Config.RasterIncrement;
+            var expectedValue = Config.RasterIncrement - 1;
 
             // Act
             Vic.ClockMultiple(Config.RasterWidth);
 
             // Assert
             Vic.RasterLineCounter.Should().Be(expectedValue);
+        }
+
+        [Test]
+        public void RasterLineCounter_ClocksCorrectNumberOfRasterLines()
+        {
+            // Arrange
+            var expectedValue = 0;
+
+            // Act
+            Vic.ClockMultiple(Config.RasterWidth * Config.RasterLinesPerFrame);
+            Vic.Clock();
+
+            // Assert
+            Vic.RasterY.Should().Be(expectedValue);
         }
     }
 }

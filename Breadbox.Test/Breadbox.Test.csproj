@@ -56,9 +56,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Vic2\Vic2BaseTestFixture.cs" />
+    <Compile Include="Vic2\Vic2BorderTests.cs" />
     <Compile Include="Vic2\Vic2RasterCounterTests.cs" />
     <Compile Include="Vic2\Vic2RegisterTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputBaseTestFixture.cs" />
+    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputDreanTests.cs" />
+    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputNewNtscTests.cs" />
+    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputOldNtscTests.cs" />
+    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputPalTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
