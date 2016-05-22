@@ -153,6 +153,22 @@ namespace Breadbox.Test.Vic2
             observedValue.Should().Be(expectedValue);
         }
 
+        [Test]
+        public void SpriteEnable_StoreAndLoad([Random(1)] int value)
+        {
+            // Arrange
+            var expectedValue = value & 0xFF;
+            var expectedBits = Enumerable.Range(0, 8).Select(i => (value & (1 << i)) != 0).ToArray();
+            const int register = 0x15;
+
+            // Act
+            Vic.WriteRegister(register, value);
+
+            // Assert
+            Vic.ReadRegister(register).Should().Be(expectedValue);
+            var observedBits = Enumerable.Range(0, 8).Select(Vic.SpriteEnabled);
+            observedBits.ShouldAllBeEquivalentTo(expectedBits);
+        }
 
     }
 }
