@@ -65,6 +65,21 @@ namespace Breadbox.Test.Vic2
         }
 
         [Test]
+        public void ControlRegister1_StoreAndLoad([Random(1)] int value)
+        {
+            // Arrange
+            const int register = 0x11;
+            var expectedValue = value & 0x7F;
+
+            // Act
+            Vic.WriteRegister(register, value);
+
+            // Assert
+            var observedValue = Vic.ReadRegister(register);
+            observedValue.Should().Be(expectedValue);
+        }
+
+        [Test]
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(255)]
