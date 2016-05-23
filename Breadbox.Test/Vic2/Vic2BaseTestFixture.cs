@@ -158,6 +158,16 @@ namespace Breadbox.Test.Vic2
             Vic.PokeRegister(0x18, (Vic.PeekRegister(0x18) & 0xF0) | ((value & 0x7) << 1));
         }
 
+        protected void SetXScroll(int value)
+        {
+            Vic.PokeRegister(0x16, (Vic.PeekRegister(0x16) & 0x38) | (value & 0x7));
+        }
+
+        protected void SetYScroll(int value)
+        {
+            Vic.PokeRegister(0x11, (Vic.PeekRegister(0x11) & 0xF8) | (value & 0x7));
+        }
+
         protected int LastAccessedAddress { get; private set; }
     }
 }

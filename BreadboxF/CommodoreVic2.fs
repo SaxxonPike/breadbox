@@ -554,12 +554,12 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
                 badLine <- false
             if rasterY = 0x000 then
                 videoCounterBase <- 0
-        if (rasterY = 0x030) && (not badLinesEnabled) && displayEnabled then
+        if (rasterY = 0x030) && displayEnabled then
             badLinesEnabled <- true
-        if not badLine then
-            badLine <- (badLinesEnabled) && ((yScroll &&& 0x7) = (rasterY &&& 0x7))
-            if badLine then
-                GoToDisplayState()
+        let lastBadLine = badLine
+        badLine <- (badLinesEnabled) && (yScroll = (rasterY &&& 0x7))
+        if badLine && lastBadLine then
+            GoToDisplayState()
         match mac with
             | 0 | 2 ->
                 // cycle 55-56
