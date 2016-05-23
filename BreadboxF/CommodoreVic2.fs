@@ -520,23 +520,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
 
     // AEC and BA
     let mutable aec = false
-    let mutable ba = false
+    let mutable ba = true
     let mutable baCounter = 24
-    let IsSpriteBa (counter:int, index:int) =
-        let lowerBound = index * 4
-        let upperBound = lowerBound + 10
-        counter >= lowerBound && counter < upperBound && mobDma.[index]
-    let IsAnySpriteBa (counter:int) =
-        IsSpriteBa(counter, 0) ||
-        IsSpriteBa(counter, 1) ||
-        IsSpriteBa(counter, 2) ||
-        IsSpriteBa(counter, 3) ||
-        IsSpriteBa(counter, 4) ||
-        IsSpriteBa(counter, 5) ||
-        IsSpriteBa(counter, 6) ||
-        IsSpriteBa(counter, 7)
-    let IsBadLineBa (counter:int) =
-        badLine && counter >= 40 && counter < 126
 
     // Border Unit
     let mutable borderVerticalEnabled = true
@@ -564,6 +549,17 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     let ClockRasterCounter (mac:int, rasterX:int) =
         if rasterLineCounter = config.RasterIncrement then
             IncrementRasterY()
+            if rasterY = 0x0F8 then
+                badLinesEnabled <- false
+                badLine <- false
+            if rasterY = 0x000 then
+                videoCounterBase <- 0
+        if (rasterY = 0x030) && (not badLinesEnabled) && displayEnabled then
+            badLinesEnabled <- true
+        if not badLine then
+            badLine <- (badLinesEnabled) && ((yScroll &&& 0x7) = (rasterY &&& 0x7))
+            if badLine then
+                GoToDisplayState()
         match mac with
             | 0 | 2 ->
                 // cycle 55-56
@@ -728,7 +724,22 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
             if mac = -1 then
                 ba
             else
-                not (IsBadLineBa(mac) || IsAnySpriteBa(mac))
+                let IsBadLineBa =
+                    badLine && mac >= 40 && mac < 126
+                let IsSpriteBa (index:int) =
+                    let lowerBound = index * 4
+                    let upperBound = lowerBound + 10
+                    mac >= lowerBound && mac < upperBound && mobDma.[index]
+                let IsAnySpriteBa () =
+                    IsSpriteBa(0) ||
+                    IsSpriteBa(1) ||
+                    IsSpriteBa(2) ||
+                    IsSpriteBa(3) ||
+                    IsSpriteBa(4) ||
+                    IsSpriteBa(5) ||
+                    IsSpriteBa(6) ||
+                    IsSpriteBa(7)
+                not (IsBadLineBa || IsAnySpriteBa())
         baCounter <-
             if ba then
                 24
@@ -943,7 +954,11 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     member this.ClockToRasterY(raster:int) =
         let actualRaster = raster % config.RasterLinesPerFrame
         while rasterY <> actualRaster do
-            this.Clock()        
+            this.Clock()
+
+    member this.ClockTo(counter:int, raster:int) =
+        this.ClockToRasterY(raster)
+        this.ClockToCounterX(counter)
 
     member this.ClockFrame () =
         this.ClockMultiple(config.RasterWidth * config.RasterLinesPerFrame)
@@ -1098,8 +1113,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     member this.XScroll = xScroll
     member this.SpriteYExpansionEnabled(index:int) = mobYExpansionEnabled.[index]
     member this.SpriteYExpansionToggle(index:int) = mobYExpansionToggle.[index]
-    member this.VideoMatrixPointer = videoMemoryPointer
-    member this.CharacterBankPointer = characterBankPointer
+    member this.VideoMatrixPointer = videoMemoryPointer >>> 10
+    member this.CharacterBankPointer = characterBankPointer >>> 11
     member this.LightPenIrq = lightPenIrq
     member this.SpriteSpriteCollisionIrq = mobMobCollisionIrq
     member this.SpriteBackgroundCollisionIrq = mobBackgroundCollisionIrq
@@ -1118,3 +1133,6 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     member this.BackgroundColor(index:int) = backgroundColor.[index]
     member this.SpriteMultiColor(index:int) = mobMultiColor.[index]
     member this.SpriteColor(index:int) = mobColor.[index]
+    member this.MemoryAccessCycle = GetMemoryAccessCycle()
+    member this.BadLine = badLine
+    member this.BadLinesEnabled = badLinesEnabled

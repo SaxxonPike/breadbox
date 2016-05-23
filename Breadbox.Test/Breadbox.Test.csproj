@@ -55,8 +55,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Vic2\Vic2BadLineTests.cs" />
     <Compile Include="Vic2\Vic2BaseTestFixture.cs" />
     <Compile Include="Vic2\Vic2BorderTests.cs" />
+    <Compile Include="Vic2\Vic2MemoryAccessTests.cs" />
     <Compile Include="Vic2\Vic2RasterCounterTests.cs" />
     <Compile Include="Vic2\Vic2RegisterTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

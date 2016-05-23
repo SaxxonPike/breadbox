@@ -38,6 +38,7 @@ namespace Breadbox.Test.Vic2
             _frameBuffer = null;
             _frameBufferIndex = 0;
             _memory = null;
+            LastAccessedAddress = 0;
         }
 
         protected abstract CommodoreVic2Configuration Config { get; }
@@ -46,8 +47,10 @@ namespace Breadbox.Test.Vic2
         {
             ClockMock.Setup(m => m.ClockPhi1());
             ClockMock.Setup(m => m.ClockPhi2());
-            MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(0x00);
-            MemoryMock.Setup(m => m.Write(It.IsAny<int>(), It.IsAny<int>()));
+            MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(0x00)
+                .Callback<int>(a => LastAccessedAddress = a);
+            MemoryMock.Setup(m => m.Write(It.IsAny<int>(), It.IsAny<int>()))
+                .Callback<int, int>((a, d) => LastAccessedAddress = a);
             VideoMock.Setup(m => m.Output(It.IsAny<CommodoreVic2VideoOutput>()));
         }
 
@@ -66,11 +69,19 @@ namespace Breadbox.Test.Vic2
         {
             if (_memory != null) return;
 
-            _memory = new int[0x3FFF];
+            _memory = new int[0x4000];
             MemoryMock.Setup(m => m.Read(It.IsAny<int>()))
-                .Returns<int>(a => _memory[a & 0x3FFF]);
+                .Returns<int>(a =>
+                {
+                    LastAccessedAddress = a;
+                    return _memory[a & 0x3FFF];
+                });
             MemoryMock.Setup(m => m.Write(It.IsAny<int>(), It.IsAny<int>()))
-                .Callback<int, int>((a, d) => _memory[a & 0x3FFF] = d & 0xFF);
+                .Callback<int, int>((a, d) =>
+                {
+                    LastAccessedAddress = a;
+                    _memory[a & 0x3FFF] = d & 0xFF;
+                });
         }
 
         protected void EnableFrameBuffer()
@@ -137,5 +148,16 @@ namespace Breadbox.Test.Vic2
             Vic.PokeRegister(0x16, (Vic.PeekRegister(0x16) & 0xF7) | (value ? 0x08 : 0x00));
         }
 
+        protected void SetVideoMemoryPointer(int value)
+        {
+            Vic.PokeRegister(0x18, (Vic.PeekRegister(0x18) & 0x0E) | ((value & 0xF) << 4));
+        }
+
+        protected void SetCharacterBankPointer(int value)
+        {
+            Vic.PokeRegister(0x18, (Vic.PeekRegister(0x18) & 0xF0) | ((value & 0x7) << 1));
+        }
+
+        protected int LastAccessedAddress { get; private set; }
     }
 }
