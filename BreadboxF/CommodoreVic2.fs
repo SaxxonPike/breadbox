@@ -2,34 +2,45 @@
 
 type CommodoreVic2Configuration(vBlankSet, cyclesPerRasterLine, rasterLinesPerFrame) =
     let rasterWidth = (cyclesPerRasterLine * 8)
-    let hBlankSet = 0x18C - ((65 - cyclesPerRasterLine) * 8)
+    let rasterOffset = ((65 - cyclesPerRasterLine) * 8)
+    let hBlankSet = 0x18C - rasterOffset
     let hBlankClear = 0x1E8 - (System.Math.Max(0, 64 - cyclesPerRasterLine) * 8)
+    let vBlankClear = (vBlankSet + 28) % rasterLinesPerFrame
+    let rasterOpsX = hBlankClear - 0x094 // 0x15C - rasterOffset 
+    let rasterIncrement = hBlankClear - 0x04C
+    let visibleRasterLines = rasterLinesPerFrame - 28
+    let visiblePixelsPerRasterLine = rasterWidth - 100
+
     member val CyclesPerRasterLine = cyclesPerRasterLine
     member val HBlankSet = hBlankSet
     member val HBlankClear = hBlankClear
     member val VBlankSet = vBlankSet
-    member val VBlankClear = (vBlankSet + 28) % rasterLinesPerFrame
+    member val VBlankClear = vBlankClear
     member val RasterLinesPerFrame = rasterLinesPerFrame
-    member val RasterOpsX = 0x15C - ((65 - cyclesPerRasterLine) * 8)
+    member val RasterOpsX = rasterOpsX
     member val RasterWidth = rasterWidth
-    member val RasterIncrement = hBlankClear - 0x04C
-    member val VisibleRasterLines = rasterLinesPerFrame - 28
-    member val VisiblePixelsPerRasterLine = (cyclesPerRasterLine * 8) - 100
+    member val RasterIncrement = rasterIncrement
+    member val VisibleRasterLines = visibleRasterLines
+    member val VisiblePixelsPerRasterLine = visiblePixelsPerRasterLine
 
 type CommodoreVic2ConfigurationFactory() =
-    member this.Create6567R56AConfiguration() = new CommodoreVic2Configuration(13, 64, 262)
-    member this.Create6567R8Configuration() = new CommodoreVic2Configuration(13, 65, 263)
-    member this.Create6569Configuration() = new CommodoreVic2Configuration(300, 63, 312)
-    member this.Create6572Configuration() = new CommodoreVic2Configuration(300, 65, 312)
+    member this.CreateOldNtscConfiguration() = new CommodoreVic2Configuration(13, 64, 262)
+    member this.CreateNewNtscConfiguration() = new CommodoreVic2Configuration(13, 65, 263)
+    member this.CreatePalBConfiguration() = new CommodoreVic2Configuration(300, 63, 312)
+    member this.CreatePalNConfiguration() = new CommodoreVic2Configuration(300, 65, 312)
+    member this.CreatePalMConfiguration() = this.CreateNewNtscConfiguration()
 
-type CommodoreVic2MemoryInterface =
-    abstract member Read: int -> int
-    abstract member Write: int * int -> unit
-
-type CommodoreVic2VideoOutput(pixel, vBlank, hBlank) =
-    member val Pixel = pixel
-    member val VBlank = vBlank
-    member val HBlank = hBlank
+type CommodoreVic2VideoOutput =
+    struct
+        val Pixel: int
+        val VBlank: bool
+        val HBlank: bool
+        new (pixel, vblank, hblank) = {
+            Pixel = pixel;
+            VBlank = vblank;
+            HBlank = hblank;
+        }
+    end
 
 type CommodoreVic2VideoInterface =
     abstract member Output: CommodoreVic2VideoOutput -> unit
@@ -38,7 +49,7 @@ type CommodoreVic2ClockInterface =
     abstract member ClockPhi1: unit -> unit
     abstract member ClockPhi2: unit -> unit
 
-type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2MemoryInterface, video:CommodoreVic2VideoInterface, clock:CommodoreVic2ClockInterface) = 
+type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface, video:CommodoreVic2VideoInterface, clock:CommodoreVic2ClockInterface) = 
 
 
     // ========================================================================
@@ -65,6 +76,16 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         arr.[5] <- (value &&& 0x20) <> 0
         arr.[6] <- (value &&& 0x40) <> 0
         arr.[7] <- (value &&& 0x80) <> 0
+
+    let clearBits(arr:bool[]) =
+        arr.[0] <- false
+        arr.[1] <- false
+        arr.[2] <- false
+        arr.[3] <- false
+        arr.[4] <- false
+        arr.[5] <- false
+        arr.[6] <- false
+        arr.[7] <- false
     
 
     // ========================================================================
@@ -73,7 +94,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
 
 
     // MnX (00, 02, 04, 06, 08, 0A, 0C, 0E, 10)
-    let mobX = Array.create 8 0
+    let mobX = Array.zeroCreate 8
     let GetLowMobX (index) =
         mobX.[index] &&& 0xFF
     let GetHighMobX () =
@@ -98,7 +119,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         mobX.[7] <- (mobX.[7] &&& 0x0FF) ||| (if value &&& 0x80 <> 0 then 0x100 else 0x000)
 
     // MxY (01, 03, 05, 07, 09, 0B, 0D, 0F)
-    let mobY = Array.create 8 0
+    let mobY = Array.zeroCreate 8
     let GetMobY (index) =
         mobY.[index]
     let SetMobY (index, value) =
@@ -110,8 +131,6 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         if y >= (config.RasterLinesPerFrame - 1) then 0 else (y + 1)
         )
     let mutable rasterYCompareValue = 0
-    let IncrementRasterY () =
-        rasterY <- nextRasterY.[rasterY]
     let GetLowRasterY () =
         rasterY &&& 0x0FF
     let SetLowRasterYCompareValue (value) =
@@ -153,7 +172,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         lightPenY <- value
 
     // MnE (15)
-    let mobEnabled = Array.create 8 false
+    let mobEnabled = Array.zeroCreate 8
     let GetMobEnable () =
         getValueFromBits(mobEnabled)
     let SetMobEnable (value) =
@@ -177,32 +196,12 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         xScroll <- (value &&& 0x07)
 
     // Mob Y Expansion (17)
-    let mobYExpansionEnabled = Array.create 8 false
-    let mobYExpansionToggle = Array.create 8 false
+    let mobYExpansionEnabled = Array.zeroCreate 8
+    let mobYExpansionToggle = Array.zeroCreate 8
     let GetMobYExpansionEnable () =
-        (if mobYExpansionEnabled.[0] then 0x01 else 0x00) |||
-        (if mobYExpansionEnabled.[1] then 0x02 else 0x00) |||
-        (if mobYExpansionEnabled.[2] then 0x04 else 0x00) |||
-        (if mobYExpansionEnabled.[3] then 0x08 else 0x00) |||
-        (if mobYExpansionEnabled.[4] then 0x10 else 0x00) |||
-        (if mobYExpansionEnabled.[5] then 0x20 else 0x00) |||
-        (if mobYExpansionEnabled.[6] then 0x40 else 0x00) |||
-        (if mobYExpansionEnabled.[7] then 0x80 else 0x00)
+        getValueFromBits(mobYExpansionEnabled)
     let SetMobYExpansionEnable (value) =
-        mobYExpansionEnabled.[0] <- (value &&& 0x01) <> 0
-        mobYExpansionEnabled.[1] <- (value &&& 0x02) <> 0
-        mobYExpansionEnabled.[2] <- (value &&& 0x04) <> 0
-        mobYExpansionEnabled.[3] <- (value &&& 0x08) <> 0
-        mobYExpansionEnabled.[4] <- (value &&& 0x10) <> 0
-        mobYExpansionEnabled.[5] <- (value &&& 0x20) <> 0
-        mobYExpansionEnabled.[6] <- (value &&& 0x40) <> 0
-        mobYExpansionEnabled.[7] <- (value &&& 0x80) <> 0
-    let SetMobYExpansionToggle (index) =
-        mobYExpansionToggle.[index] <- true
-    let ClearMobYExpansionToggle (index) =
-        mobYExpansionToggle.[index] <- false
-    let InvertMobYExpansionToggle (index) =
-        mobYExpansionToggle.[index] <- not mobYExpansionToggle.[index]
+        setBitsFromValue(mobYExpansionEnabled, value)
 
     // Memory Pointers (18) (VM and CB are pre-shifted on store for speed)
     let mutable videoMemoryPointer = 0
@@ -211,7 +210,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         (videoMemoryPointer >>> 6) |||
         (characterBankPointer >>> 10) |||
         0x01
-    let SetMemoryPointers (value:int) =
+    let SetMemoryPointers (value) =
         videoMemoryPointer <- (value &&& 0xF0) <<< 6
         characterBankPointer <- (value &&& 0x0E) <<< 10
 
@@ -253,152 +252,76 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
             (rasterIrq && rasterIrqEnabled)
 
     // Sprite Data Priority (1B)
-    let mobDataPriority = Array.create 8 false
+    let mobDataPriority = Array.zeroCreate 8
     let GetMobDataPriority () =
-        (if mobDataPriority.[0] then 0x01 else 0x00) |||
-        (if mobDataPriority.[1] then 0x02 else 0x00) |||
-        (if mobDataPriority.[2] then 0x04 else 0x00) |||
-        (if mobDataPriority.[3] then 0x08 else 0x00) |||
-        (if mobDataPriority.[4] then 0x10 else 0x00) |||
-        (if mobDataPriority.[5] then 0x20 else 0x00) |||
-        (if mobDataPriority.[6] then 0x40 else 0x00) |||
-        (if mobDataPriority.[7] then 0x80 else 0x00)
+        getValueFromBits(mobDataPriority)
     let SetMobDataPriority (value) =
-        mobDataPriority.[0] <- (value &&& 0x01) <> 0
-        mobDataPriority.[1] <- (value &&& 0x02) <> 0
-        mobDataPriority.[2] <- (value &&& 0x04) <> 0
-        mobDataPriority.[3] <- (value &&& 0x08) <> 0
-        mobDataPriority.[4] <- (value &&& 0x10) <> 0
-        mobDataPriority.[5] <- (value &&& 0x20) <> 0
-        mobDataPriority.[6] <- (value &&& 0x40) <> 0
-        mobDataPriority.[7] <- (value &&& 0x80) <> 0
+        setBitsFromValue(mobDataPriority, value)
 
     // Sprite Multicolor Enable (1C)
-    let mobMultiColorEnabled = Array.create 8 false
-    let mobMultiColorToggle = Array.create 8 false
+    let mobMultiColorEnabled = Array.zeroCreate 8
+    let mobMultiColorToggle = Array.zeroCreate 8
     let GetMobMultiColorEnable () =
-        (if mobMultiColorEnabled.[0] then 0x01 else 0x00) |||
-        (if mobMultiColorEnabled.[1] then 0x02 else 0x00) |||
-        (if mobMultiColorEnabled.[2] then 0x04 else 0x00) |||
-        (if mobMultiColorEnabled.[3] then 0x08 else 0x00) |||
-        (if mobMultiColorEnabled.[4] then 0x10 else 0x00) |||
-        (if mobMultiColorEnabled.[5] then 0x20 else 0x00) |||
-        (if mobMultiColorEnabled.[6] then 0x40 else 0x00) |||
-        (if mobMultiColorEnabled.[7] then 0x80 else 0x00)
+        getValueFromBits(mobMultiColorEnabled)
     let SetMobMultiColorEnable (value) =
-        mobMultiColorEnabled.[0] <- (value &&& 0x01) <> 0
-        mobMultiColorEnabled.[1] <- (value &&& 0x02) <> 0
-        mobMultiColorEnabled.[2] <- (value &&& 0x04) <> 0
-        mobMultiColorEnabled.[3] <- (value &&& 0x08) <> 0
-        mobMultiColorEnabled.[4] <- (value &&& 0x10) <> 0
-        mobMultiColorEnabled.[5] <- (value &&& 0x20) <> 0
-        mobMultiColorEnabled.[6] <- (value &&& 0x40) <> 0
-        mobMultiColorEnabled.[7] <- (value &&& 0x80) <> 0
+        setBitsFromValue(mobMultiColorEnabled, value)
     
     // Sprite X Expansion Enable (1D)
-    let mobXExpansionEnabled = Array.create 8 false
-    let mobXExpansionToggle = Array.create 8 false
+    let mobXExpansionEnabled = Array.zeroCreate 8
+    let mobXExpansionToggle = Array.zeroCreate 8
     let GetMobXExpansionEnable () =
-        (if mobXExpansionEnabled.[0] then 0x01 else 0x00) |||
-        (if mobXExpansionEnabled.[1] then 0x02 else 0x00) |||
-        (if mobXExpansionEnabled.[2] then 0x04 else 0x00) |||
-        (if mobXExpansionEnabled.[3] then 0x08 else 0x00) |||
-        (if mobXExpansionEnabled.[4] then 0x10 else 0x00) |||
-        (if mobXExpansionEnabled.[5] then 0x20 else 0x00) |||
-        (if mobXExpansionEnabled.[6] then 0x40 else 0x00) |||
-        (if mobXExpansionEnabled.[7] then 0x80 else 0x00)
+        getValueFromBits(mobXExpansionEnabled)
     let SetMobXExpansionEnable (value) =
-        mobXExpansionEnabled.[0] <- (value &&& 0x01) <> 0
-        mobXExpansionEnabled.[1] <- (value &&& 0x02) <> 0
-        mobXExpansionEnabled.[2] <- (value &&& 0x04) <> 0
-        mobXExpansionEnabled.[3] <- (value &&& 0x08) <> 0
-        mobXExpansionEnabled.[4] <- (value &&& 0x10) <> 0
-        mobXExpansionEnabled.[5] <- (value &&& 0x20) <> 0
-        mobXExpansionEnabled.[6] <- (value &&& 0x40) <> 0
-        mobXExpansionEnabled.[7] <- (value &&& 0x80) <> 0
-    let SetMobXExpansionToggle (index:int) =
-        mobXExpansionToggle.[index] <- true
-    let ClearMobXExpansionToggle (index:int) =
-        mobXExpansionToggle.[index] <- false
-    let InvertMobXExpansionToggle (index:int) =
-        mobXExpansionToggle.[index] <- not mobXExpansionToggle.[index]
+        setBitsFromValue(mobXExpansionEnabled, value)
 
     // Sprite-sprite Collision (1E)
     let mutable mobMobFirstCollidedIndex = -1
     let mutable mobMobCollisionOccurred = false
-    let mobMobCollision = Array.create 8 false
+    let mobMobCollision = Array.zeroCreate 8
     let GetMobMobCollision () =
-        (if mobMobCollision.[0] then 0x01 else 0x00) |||
-        (if mobMobCollision.[1] then 0x02 else 0x00) |||
-        (if mobMobCollision.[2] then 0x04 else 0x00) |||
-        (if mobMobCollision.[3] then 0x08 else 0x00) |||
-        (if mobMobCollision.[4] then 0x10 else 0x00) |||
-        (if mobMobCollision.[5] then 0x20 else 0x00) |||
-        (if mobMobCollision.[6] then 0x40 else 0x00) |||
-        (if mobMobCollision.[7] then 0x80 else 0x00)
+        getValueFromBits(mobMobCollision)
     let ClearAndGetMobMobCollision () =
         let oldValue = GetMobMobCollision()
-        mobMobCollision.[0] <- false
-        mobMobCollision.[1] <- false
-        mobMobCollision.[2] <- false
-        mobMobCollision.[3] <- false
-        mobMobCollision.[4] <- false
-        mobMobCollision.[5] <- false
-        mobMobCollision.[6] <- false
-        mobMobCollision.[7] <- false
+        clearBits(mobMobCollision)
         mobMobFirstCollidedIndex <- -1
         oldValue
 
     // Sprite-background Collision (1F)
     let mobDataCollisionOccurred = false
-    let mobDataCollision = Array.create 8 false
+    let mobDataCollision = Array.zeroCreate 8
     let GetMobDataCollision () =
-        (if mobDataCollision.[0] then 0x01 else 0x00) |||
-        (if mobDataCollision.[1] then 0x02 else 0x00) |||
-        (if mobDataCollision.[2] then 0x04 else 0x00) |||
-        (if mobDataCollision.[3] then 0x08 else 0x00) |||
-        (if mobDataCollision.[4] then 0x10 else 0x00) |||
-        (if mobDataCollision.[5] then 0x20 else 0x00) |||
-        (if mobDataCollision.[6] then 0x40 else 0x00) |||
-        (if mobDataCollision.[7] then 0x80 else 0x00)
+        getValueFromBits(mobDataCollision)
     let ClearAndGetMobDataCollision () =
         let oldValue = GetMobDataCollision()
-        mobDataCollision.[0] <- false
-        mobDataCollision.[1] <- false
-        mobDataCollision.[2] <- false
-        mobDataCollision.[3] <- false
-        mobDataCollision.[4] <- false
-        mobDataCollision.[5] <- false
-        mobDataCollision.[6] <- false
-        mobDataCollision.[7] <- false
+        clearBits(mobDataCollision)
         oldValue
 
     // Border Color (20)
     let mutable borderColor = 0
     let GetBorderColor () =
         borderColor ||| 0xF0
-    let SetBorderColor (value:int) =
+    let SetBorderColor (value) =
         borderColor <- value &&& 0x0F
 
     // Background Colors (21, 22, 23, 24)
-    let backgroundColor = Array.create 4 0
-    let GetBackgroundColor (index:int) =
+    let backgroundColor = Array.zeroCreate 4
+    let GetBackgroundColor (index) =
         backgroundColor.[index] ||| 0xF0
-    let SetBackgroundColor (index:int, value:int) =
+    let SetBackgroundColor (index, value) =
         backgroundColor.[index] <- value &&& 0x0F
 
     // Sprite Multicolors (25, 26)
-    let mobMultiColor = Array.create 2 0
-    let GetMobMultiColor (index:int) =
+    let mobMultiColor = Array.zeroCreate 2
+    let GetMobMultiColor (index) =
         mobMultiColor.[index] ||| 0xF0
-    let SetMobMultiColor (index:int, value:int) =
+    let SetMobMultiColor (index, value) =
         mobMultiColor.[index] <- value &&& 0x0F
 
     // Sprite Colors (27, 28, 29, 2A, 2B, 2C, 2D, 2E)
-    let mobColor = Array.create 8 0
-    let GetMobColor (index:int) =
+    let mobColor = Array.zeroCreate 8
+    let GetMobColor (index) =
         mobColor.[index] ||| 0xF0
-    let SetMobColor (index:int, value:int) =
+    let SetMobColor (index, value) =
         mobColor.[index] <- value &&& 0x0F
 
 
@@ -420,10 +343,11 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
             else
                 adjustedCycle
         )
+    let nextRasterLineCounter = Array.init (config.RasterWidth) (fun x ->
+        if x >= (config.RasterWidth - 1) then 0 else (x + 1)
+        )
 
     let mutable rasterLineCounter = config.RasterIncrement - 1
-    let IncrementRasterLineCounter () =
-        rasterLineCounter <- if rasterLineCounter >= (config.RasterWidth - 1) then 0 else rasterLineCounter + 1
     let GetRasterX () =
         rasterX.[rasterLineCounter]
 
@@ -475,7 +399,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     let mutable videoCounter = 0
     let mutable videoCounterBase = 0
     let mutable videoMatrixLineIndex = 0
-    let videoMatrixLineMemory = Array.create 40 0
+    let videoMatrixLineMemory = Array.zeroCreate 40
     let IncrementVideoCounter () =
         videoCounter <- (videoCounter + 1) &&& 0x3FF
         videoMatrixLineIndex <- (videoMatrixLineIndex + 1) &&& 0x3F
@@ -486,10 +410,6 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         videoMatrixLineIndex <- 0
     let ResetVideoCounterBase () =
         videoCounterBase <- 0
-    let GetVideoMatrixLineMemory () =
-        if videoMatrixLineIndex < 40 then videoMatrixLineMemory.[videoMatrixLineIndex] else 0
-    let SetVideoMatrixLineMemory (value:int) =
-        if videoMatrixLineIndex < 40 then videoMatrixLineMemory.[videoMatrixLineIndex] <- value
 
     // Graphics shift registers
     let mutable graphicsShiftRegister = 0
@@ -502,25 +422,23 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     let mutable graphicsPendingG = 0
 
     // MC, MCBASE, MDMA, MDC, MP
-    let mobCounter = Array.create 8 0
-    let mobCounterBase = Array.create 8 0
-    let mobDma = Array.create 8 false
-    let mobDataCrunch = Array.create 8 false
-    let mobPointer = Array.create 8 0
-    let mobDisplay = Array.create 8 false
+    let mobCounter = Array.zeroCreate 8
+    let mobCounterBase = Array.zeroCreate 8
+    let mobDma = Array.zeroCreate 8
+    let mobDataCrunch = Array.zeroCreate 8
+    let mobPointer = Array.zeroCreate 8
+    let mobDisplay = Array.zeroCreate 8
 
     // Sprite shift registers
-    let mobShiftRegister = Array.create 8 0
-    let mobShiftRegisterEnable = Array.create 8 false
-    let mobShiftRegisterOutput = Array.create 8 0
+    let mobShiftRegister = Array.zeroCreate 8
+    let mobShiftRegisterEnable = Array.zeroCreate 8
+    let mobShiftRegisterOutput = Array.zeroCreate 8
 
     // Display/Idle state
     let mutable displayState = false
 
     // Refresh counter
     let mutable refreshCounter = 0
-    let DecrementRefreshCounter () =
-        refreshCounter <- (refreshCounter - 1) &&& 0xFF
 
     // Bad lines
     let mutable badLinesEnabled = false
@@ -535,8 +453,6 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     let mutable borderVerticalEnabled = true
     let mutable borderMainEnabled = true
     let mutable borderEnableDelay = -1
-    let GetBorderOutput () =
-        (borderEnableDelay &&& 0x100) <> 0
 
     // Light Pen
     let mutable lightPenTriggeredThisFrame = false
@@ -557,26 +473,29 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     // 60: 10  PS   5:  26  PS  13: 42  R-  21: 58  GC  29: 74  GC  37: 90  GC  45: 106 GC  53: 122 GC
     // 61: 12  SS   6:  28  SS  14: 44  R-  22: 60  GC  30: 76  GC  38: 92  GC  46: 108 GC  54: 124 GC
     // 62: 14  PS   7:  30  PS  15: 46  RC  23: 62  GC  31: 78  GC  39: 94  GC  47: 110 GC
-    let ClockRasterCounter (mac:int, rasterX:int) =
+    let ClockRasterCounter (mac, rasterX) =
         if rasterLineCounter = config.RasterIncrement then
-            IncrementRasterY()
+            rasterY <- nextRasterY.[rasterY]
             if rasterY = 0x0F8 then
                 badLinesEnabled <- false
                 badLine <- false
             if rasterY = 0x000 then
                 videoCounterBase <- 0
                 lightPenTriggeredThisFrame <- false
+
         if (rasterY = 0x030) && displayEnabled then
             badLinesEnabled <- true
+
         let lastBadLine = badLine
         badLine <- (badLinesEnabled) && (yScroll = (rasterY &&& 0x7))
         if badLine && (not lastBadLine) then
             displayState <- true
+
         match mac with
             | 0 | 2 ->
                 // cycle 55-56
                 if mac = 0 then
-                    let toggleExpansionIfEnabled (index:int) =
+                    let toggleExpansionIfEnabled (index) =
                         mobYExpansionToggle.[index] <- mobYExpansionToggle.[index] <> mobYExpansionEnabled.[index]
                     toggleExpansionIfEnabled(0)
                     toggleExpansionIfEnabled(1)
@@ -586,7 +505,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
                     toggleExpansionIfEnabled(5)
                     toggleExpansionIfEnabled(6)
                     toggleExpansionIfEnabled(7)
-                let checkSpriteEnable (index:int) =
+                let checkSpriteEnable (index) =
                     if mobEnabled.[index] && (mobY.[index] &&& 0x7) = (rasterY &&& 0x7) then
                         if not mobDma.[index] then
                             mobDma.[index] <- true
@@ -607,7 +526,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
                     videoCounterBase <- videoCounter
                 if displayState then
                     IncrementRowCounter()
-                let reloadMobCounter (index:int) =
+                let reloadMobCounter (index) =
                     mobShiftRegisterEnable.[index] <- false
                     mobCounter.[index] <- mobCounterBase.[index]
                     if mobDma.[index] then
@@ -631,7 +550,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
                     rowCounter <- 0
             | 48 ->
                 // cycle 16
-                let checkSpriteCrunch (index:int) =
+                let checkSpriteCrunch (index) =
                     if mobYExpansionToggle.[index] then
                         mobCounterBase.[index] <-
                             if mobDataCrunch.[index] then
@@ -651,22 +570,26 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
             | _ -> ()
 
     // Memory Interface, Address Generator, Refresh Counter
-    let ClockMemoryInterface (mac:int) =
-        let readP (index:int) =
+    let ClockMemoryInterface (mac) =
+        let readP (index) =
             mobPointer.[index] <- (memory.Read(videoMemoryPointer ||| 0x3F8 ||| index) &&& 0xFF) <<< 6
-        let readS (index:int, counter:int) =
+
+        let readS (index, counter) =
             if mobDma.[index] then
                 mobShiftRegister.[index] <- (mobShiftRegister.[index] <<< 8) ||| (memory.Read(mobCounter.[index] ||| mobPointer.[index]) &&& 0xFF)
                 mobCounter.[index] <- mobCounter.[index] + 1
             else
                 if counter = 1 then
                     memory.Read(0x3FFF) |> ignore
+
         let readC () =
             if badLine then
                 graphicsReadC <- memory.Read(videoMemoryPointer ||| videoCounter)
-                SetVideoMatrixLineMemory(graphicsReadC)
+                if videoMatrixLineIndex < 40 then
+                    videoMatrixLineMemory.[videoMatrixLineIndex] <- graphicsReadC
             else
                 memory.Read(0x3FFF) |> ignore
+
         let readG () =
             graphicsReadG <-
                 memory.Read((if extraColorMode then 0x39FF else 0x3FFF) &&&
@@ -674,15 +597,20 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
                         if (bitmapMode) then
                             (characterBankPointer &&& 0x2000) ||| (videoCounter <<< 3) ||| rowCounter
                         else
-                            characterBankPointer ||| (GetVideoMatrixLineMemory() &&& 0xFF) ||| rowCounter
+                            let videoMatrixLineMemory =
+                                if videoMatrixLineIndex < 40 then
+                                    videoMatrixLineMemory.[videoMatrixLineIndex] else 0
+                            characterBankPointer ||| ((videoMatrixLineMemory &&& 0xFF) <<< 3) ||| rowCounter
                     else
                         0x3FFF
                 ) &&& 0xFF
             IncrementVideoCounter()
+
         let readI () =
             memory.Read(0x3FFF) |> ignore
+
         let readR () =
-            DecrementRefreshCounter()
+            refreshCounter <- (refreshCounter - 1) &&& 0xFF
             memory.Read(0x3F00 ||| refreshCounter) |> ignore
         match mac with
             | -1 -> ()
@@ -731,14 +659,14 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
                     if (x >= 47 && x < 127) then
                         readC()
 
-    let ClockBaAec(mac:int) =
+    let ClockBaAec(mac) =
         ba <-
             if mac = -1 then
                 ba
             else
                 let IsBadLineBa =
                     badLine && mac >= 40 && mac < 126
-                let IsSpriteBa (index:int) =
+                let IsSpriteBa (index) =
                     let lowerBound = index * 4
                     let upperBound = lowerBound + 10
                     mac >= lowerBound && mac < upperBound && mobDma.[index]
@@ -765,7 +693,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     let ClockIrq() =
         UpdateIrq()
 
-    let ClockSprite (index:int, rasterX:int) =
+    let ClockSprite (index, rasterX) =
         let display = mobDisplay.[index]
         if display then
             let expandX = mobXExpansionEnabled.[index]
@@ -781,7 +709,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
                     mobMultiColorToggle.[index] <- (not multiColor) || (mobMultiColorToggle.[index] <> multiColor)
                 mobXExpansionToggle.[index] <- (not expandX) || (mobXExpansionToggle.[index] <> expandX)
 
-    let ClockSprites (rasterX:int) =
+    let ClockSprites (rasterX) =
         ClockSprite(0, rasterX)
         ClockSprite(1, rasterX)
         ClockSprite(2, rasterX)
@@ -791,7 +719,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         ClockSprite(6, rasterX)
         ClockSprite(7, rasterX)
 
-    let ClockGraphics (mac:int, rasterX:int) =
+    let ClockGraphics (mac, rasterX) =
         graphicsShiftRegisterMultiColorToggle <- not graphicsShiftRegisterMultiColorToggle
         if (mac >= 0) && (mac &&& 1 = 1) then
             graphicsPendingC <- graphicsReadC
@@ -808,7 +736,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
             graphicsShiftRegisterOutput <- graphicsShiftRegister &&& (if multiColor then 0xC0 else 0x80)
             graphicsShiftRegister <- graphicsShiftRegister <<< (if multiColor then 2 else 1)
 
-    let ClockBorder (mac:int) =
+    let ClockBorder (mac) =
         let leftCompare = if columnSelect then 0x018 else 0x01F
         let rightCompare = if columnSelect then 0x158 else 0x14F
         let topCompare = if rowSelect then 0x033 else 0x037
@@ -833,11 +761,11 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
         borderEnableDelay <- (borderEnableDelay <<< 1) ||| (if (borderMainEnabled || borderVerticalEnabled) then 1 else 0)
 
     let ClockPixel () =
-        if GetBorderOutput() then
+        if (borderEnableDelay &&& 0x100) <> 0 then
             borderColor
         else
             mobMobFirstCollidedIndex <- -1
-            let outputForSprite(index:int) =
+            let outputForSprite(index) =
                 match mobShiftRegisterOutput.[index] with
                     | 0x000000 -> -1
                     | bits ->
@@ -931,7 +859,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
 
 
     member this.Clock () =
-        IncrementRasterLineCounter()
+        rasterLineCounter <- nextRasterLineCounter.[rasterLineCounter]
+
         let mac = GetMemoryAccessCycle()
         let rasterX = GetRasterX()
 
@@ -949,7 +878,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
             | 4 -> clock.ClockPhi2()
             | _ -> ()
 
-    member this.ClockMultiple (count:int) =
+    member this.ClockMultiple (count) =
         let mutable i = count
         while i > 0 do
             this.Clock()
@@ -958,17 +887,17 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     member this.ClockRaster() =
         this.ClockMultiple(config.RasterWidth)
 
-    member this.ClockToCounterX(counter:int) =
+    member this.ClockToCounterX(counter) =
         let actualCounter = counter % config.RasterWidth
         while rasterLineCounter <> actualCounter do
             this.Clock()
 
-    member this.ClockToRasterY(raster:int) =
+    member this.ClockToRasterY(raster) =
         let actualRaster = raster % config.RasterLinesPerFrame
         while rasterY <> actualRaster do
             this.Clock()
 
-    member this.ClockTo(counter:int, raster:int) =
+    member this.ClockTo(counter, raster) =
         this.ClockToRasterY(raster)
         this.ClockToCounterX(counter)
 
@@ -982,7 +911,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
 
 
     // Register Access
-    member this.PeekRegister (address:int) =
+    member this.PeekRegister (address) =
         match (address &&& 0x3F) with
             | 0x00 -> GetLowMobX(0)
             | 0x01 -> GetMobY(0)
@@ -1033,7 +962,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
             | 0x2E -> GetMobColor(7)
             | _ -> 0xFF
 
-    member this.PokeRegister (address:int, value:int) =
+    member this.PokeRegister (address, value) =
         match (address &&& 0x3F) with
             | 0x00 -> SetLowMobX(0, value)
             | 0x01 -> SetMobY(0, value)
@@ -1080,13 +1009,13 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
             | 0x2E -> SetMobColor(7, value)
             | _ -> ()
 
-    member this.ReadRegister(address:int) =
+    member this.ReadRegister(address) =
         match (address &&& 0x3F) with
             | 0x1E -> ClearAndGetMobMobCollision()
             | 0x1F -> ClearAndGetMobDataCollision()
             | _ -> this.PeekRegister(address)
 
-    member this.WriteRegister(address:int, value:int) =
+    member this.WriteRegister(address, value) =
         match (address &&& 0x3F) with
             | 0x13 | 0x14 | 0x1E | 0x1F -> ()
             | _ -> this.PokeRegister(address, value)
@@ -1105,18 +1034,18 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     member this.RasterLineCounter = rasterLineCounter
     member this.RasterX = GetRasterX()
     member this.RasterYCompareValue = rasterYCompareValue
-    member this.SpriteCrunched(index:int) = mobDataCrunch.[index]
-    member this.SpriteDisplay(index:int) = mobDisplay.[index]
-    member this.SpriteDma(index:int) = mobDma.[index]
-    member this.SpriteCounter(index:int) = mobCounter.[index]
-    member this.SpriteCounterBase(index:int) = mobCounterBase.[index]
-    member this.SpriteMultiColorToggle(index:int) = mobMultiColorToggle.[index]
+    member this.SpriteCrunched(index) = mobDataCrunch.[index]
+    member this.SpriteDisplay(index) = mobDisplay.[index]
+    member this.SpriteDma(index) = mobDma.[index]
+    member this.SpriteCounter(index) = mobCounter.[index]
+    member this.SpriteCounterBase(index) = mobCounterBase.[index]
+    member this.SpriteMultiColorToggle(index) = mobMultiColorToggle.[index]
     member this.GraphicsMultiColorToggle = graphicsShiftRegisterMultiColorToggle
     member this.BorderMainEnabled = borderMainEnabled
     member this.BorderVerticalEnabled = borderVerticalEnabled
 
-    member this.SpriteX(index:int) = mobX.[index]
-    member this.SpriteY(index:int) = mobY.[index]
+    member this.SpriteX(index) = mobX.[index]
+    member this.SpriteY(index) = mobY.[index]
     member this.ExtraColorMode = extraColorMode
     member this.BitmapMode = bitmapMode
     member this.DisplayEnabled = displayEnabled
@@ -1125,13 +1054,13 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     member this.RasterY = rasterY
     member this.LightPenX = lightPenX
     member this.LightPenY = lightPenY
-    member this.SpriteEnabled(index:int) = mobEnabled.[index]
+    member this.SpriteEnabled(index) = mobEnabled.[index]
     member this.Res = res
     member this.MultiColorMode = multiColorMode
     member this.ColumnSelect = columnSelect
     member this.XScroll = xScroll
-    member this.SpriteYExpansionEnabled(index:int) = mobYExpansionEnabled.[index]
-    member this.SpriteYExpansionToggle(index:int) = mobYExpansionToggle.[index]
+    member this.SpriteYExpansionEnabled(index) = mobYExpansionEnabled.[index]
+    member this.SpriteYExpansionToggle(index) = mobYExpansionToggle.[index]
     member this.VideoMatrixPointer = videoMemoryPointer >>> 10
     member this.CharacterBankPointer = characterBankPointer >>> 11
     member this.LightPenIrq = lightPenIrq
@@ -1142,17 +1071,18 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:CommodoreVic2Me
     member this.SpriteSpriteCollisionIrqEnabled = mobMobCollisionIrqEnabled
     member this.SpriteBackgroundCollisionIrqEnabled = mobBackgroundCollisionIrqEnabled
     member this.RasterIrqEnabled = rasterIrqEnabled
-    member this.SpriteDataPriority(index:int) = mobDataPriority.[index]
-    member this.SpriteMultiColorEnabled(index:int) = mobMultiColorEnabled.[index]
-    member this.SpriteXExpansionEnabled(index:int) = mobXExpansionEnabled.[index]
-    member this.SpriteXExpansionToggle(index:int) = mobXExpansionToggle.[index]
-    member this.SpriteSpriteCollision(index:int) = mobMobCollision.[index]
-    member this.SpriteBackgroundCollision(index:int) = mobDataCollision.[index]
+    member this.SpriteDataPriority(index) = mobDataPriority.[index]
+    member this.SpriteMultiColorEnabled(index) = mobMultiColorEnabled.[index]
+    member this.SpriteXExpansionEnabled(index) = mobXExpansionEnabled.[index]
+    member this.SpriteXExpansionToggle(index) = mobXExpansionToggle.[index]
+    member this.SpriteSpriteCollision(index) = mobMobCollision.[index]
+    member this.SpriteBackgroundCollision(index) = mobDataCollision.[index]
     member this.BorderColor = borderColor
-    member this.BackgroundColor(index:int) = backgroundColor.[index]
-    member this.SpriteMultiColor(index:int) = mobMultiColor.[index]
-    member this.SpriteColor(index:int) = mobColor.[index]
+    member this.BackgroundColor(index) = backgroundColor.[index]
+    member this.SpriteMultiColor(index) = mobMultiColor.[index]
+    member this.SpriteColor(index) = mobColor.[index]
     member this.MemoryAccessCycle = GetMemoryAccessCycle()
     member this.BadLine = badLine
     member this.BadLinesEnabled = badLinesEnabled
     member this.DisplayState = displayState
+    member this.VideoMatrix (index) = videoMatrixLineMemory.[index]

@@ -15,7 +15,7 @@ namespace Breadbox.Test.Vic2
         private int[] _memory;
 
         protected Mock<CommodoreVic2ClockInterface> ClockMock;
-        protected Mock<CommodoreVic2MemoryInterface> MemoryMock;
+        protected Mock<MemoryInterface> MemoryMock;
         protected Mock<CommodoreVic2VideoInterface> VideoMock;
         protected CommodoreVic2Chip Vic { get; private set; }
 
@@ -25,7 +25,7 @@ namespace Breadbox.Test.Vic2
             _config = Config;
 
             ClockMock = new Mock<CommodoreVic2ClockInterface>();
-            MemoryMock = new Mock<CommodoreVic2MemoryInterface>();
+            MemoryMock = new Mock<MemoryInterface>();
             VideoMock = new Mock<CommodoreVic2VideoInterface>();
             SetUpMocks();
             Vic = new CommodoreVic2Chip(_config, MemoryMock.Object, VideoMock.Object, ClockMock.Object);

@@ -1,10 +1,14 @@
-﻿using BreadboxF;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using BreadboxF;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Vic2.VideoOutput
+namespace Breadbox.Test.Vic2.MemoryAccess
 {
     [TestFixture]
-    public class Vic2VideoOutputOldNtscTests : Vic2VideoOutputBaseTestFixture
+    public class Vic2MemoryAccessOldNtscTests : Vic2MemoryAccessBaseTestFixture
     {
         protected override CommodoreVic2Configuration Config
         {

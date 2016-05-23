@@ -55,18 +55,24 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessNewNtscTests.cs" />
+    <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessOldNtscTests.cs" />
+    <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessPalBTests.cs" />
+    <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessPalMTests.cs" />
+    <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessPalNTests.cs" />
     <Compile Include="Vic2\Vic2BadLineTests.cs" />
     <Compile Include="Vic2\Vic2BaseTestFixture.cs" />
     <Compile Include="Vic2\Vic2BorderTests.cs" />
-    <Compile Include="Vic2\Vic2MemoryAccessTests.cs" />
+    <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessBaseTestFixture.cs" />
     <Compile Include="Vic2\Vic2RasterCounterTests.cs" />
     <Compile Include="Vic2\Vic2RegisterTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Vic2\VideoOutput\Vic2VideoOutputBaseTestFixture.cs" />
-    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputDreanTests.cs" />
+    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputPalMTests.cs" />
+    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputPalNTests.cs" />
     <Compile Include="Vic2\VideoOutput\Vic2VideoOutputNewNtscTests.cs" />
     <Compile Include="Vic2\VideoOutput\Vic2VideoOutputOldNtscTests.cs" />
-    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputPalTests.cs" />
+    <Compile Include="Vic2\VideoOutput\Vic2VideoOutputPalBTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

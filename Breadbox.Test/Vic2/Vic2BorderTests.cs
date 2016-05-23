@@ -13,7 +13,7 @@ namespace Breadbox.Test.Vic2
     {
         protected override CommodoreVic2Configuration Config
         {
-            get { return new CommodoreVic2ConfigurationFactory().Create6567R8Configuration(); }
+            get { return new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration(); }
         }
 
         private const int TopRowSelectOff = 0x037;

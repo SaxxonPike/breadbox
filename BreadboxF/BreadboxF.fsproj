@@ -44,6 +44,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Interfaces.fs" />
+    <Compile Include="CommodoreSid.fs" />
     <Compile Include="CommodoreVic2.fs" />
   </ItemGroup>
   <PropertyGroup>

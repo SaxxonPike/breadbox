@@ -11,7 +11,7 @@ namespace Breadbox.Test.Vic2
     {
         protected override CommodoreVic2Configuration Config
         {
-            get { return new CommodoreVic2ConfigurationFactory().Create6567R8Configuration(); }
+            get { return new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration(); }
         }
 
         private void TestSpriteRegister(int register, int value, Func<int, bool> test)
