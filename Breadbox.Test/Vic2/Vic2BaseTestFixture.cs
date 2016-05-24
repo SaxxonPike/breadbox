@@ -168,6 +168,21 @@ namespace Breadbox.Test.Vic2
             Vic.PokeRegister(0x11, (Vic.PeekRegister(0x11) & 0xF8) | (value & 0x7));
         }
 
+        protected void SetExtraColorMode(bool value)
+        {
+            Vic.PokeRegister(0x11, (Vic.PeekRegister(0x11) & 0xBF) | (value ? 0x40 : 0x00));
+        }
+
+        protected void SetBitmapMode(bool value)
+        {
+            Vic.PokeRegister(0x11, (Vic.PeekRegister(0x11) & 0xDF) | (value ? 0x20 : 0x00));
+        }
+
+        protected void SetMultiColorMode(bool value)
+        {
+            Vic.PokeRegister(0x16, (Vic.PeekRegister(0x16) & 0xEF) | (value ? 0x10 : 0x00));
+        }
+
         protected int LastAccessedAddress { get; private set; }
     }
 }
