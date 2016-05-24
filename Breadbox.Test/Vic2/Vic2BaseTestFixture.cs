@@ -2,7 +2,7 @@
 using BreadboxF;
 using Moq;
 using NUnit.Framework;
-using NUnit.Framework.Constraints;
+using NUnit.Framework.Compatibility;
 
 namespace Breadbox.Test.Vic2
 {
@@ -12,7 +12,8 @@ namespace Breadbox.Test.Vic2
         private CommodoreVic2Configuration _config;
         private int[] _frameBuffer;
         private int _frameBufferIndex;
-        private int[] _memory;
+
+        private Stopwatch _stopwatch;
 
         protected Mock<CommodoreVic2ClockInterface> ClockMock;
         protected Mock<MemoryInterface> MemoryMock;
@@ -29,16 +30,18 @@ namespace Breadbox.Test.Vic2
             VideoMock = new Mock<CommodoreVic2VideoInterface>();
             SetUpMocks();
             Vic = new CommodoreVic2Chip(_config, MemoryMock.Object, VideoMock.Object, ClockMock.Object);
+            _stopwatch = new Stopwatch();
+            _stopwatch.Start();
         }
 
         [TearDown]
         public void TearDown()
         {
+            _stopwatch.Stop();
+            Console.WriteLine("Elapsed time: {0}ms", _stopwatch.ElapsedMilliseconds);
             PixelsOutputToFrameBuffer = 0;
             _frameBuffer = null;
             _frameBufferIndex = 0;
-            _memory = null;
-            LastAccessedAddress = 0;
         }
 
         protected abstract CommodoreVic2Configuration Config { get; }
@@ -47,41 +50,9 @@ namespace Breadbox.Test.Vic2
         {
             ClockMock.Setup(m => m.ClockPhi1());
             ClockMock.Setup(m => m.ClockPhi2());
-            MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(0x00)
-                .Callback<int>(a => LastAccessedAddress = a);
-            MemoryMock.Setup(m => m.Write(It.IsAny<int>(), It.IsAny<int>()))
-                .Callback<int, int>((a, d) => LastAccessedAddress = a);
+            MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(0x00);
+            MemoryMock.Setup(m => m.Write(It.IsAny<int>(), It.IsAny<int>()));
             VideoMock.Setup(m => m.Output(It.IsAny<CommodoreVic2VideoOutput>()));
-        }
-
-        protected void PatchPersistentMemory(int address, params int[] data)
-        {
-            if (_memory == null) return;
-
-            foreach (var d in data)
-            {
-                _memory[address & 0x3FFF] = d;
-                address++;
-            }
-        }
-
-        protected void EnablePersistentMemory()
-        {
-            if (_memory != null) return;
-
-            _memory = new int[0x4000];
-            MemoryMock.Setup(m => m.Read(It.IsAny<int>()))
-                .Returns<int>(a =>
-                {
-                    LastAccessedAddress = a;
-                    return _memory[a & 0x3FFF];
-                });
-            MemoryMock.Setup(m => m.Write(It.IsAny<int>(), It.IsAny<int>()))
-                .Callback<int, int>((a, d) =>
-                {
-                    LastAccessedAddress = a;
-                    _memory[a & 0x3FFF] = d & 0xFF;
-                });
         }
 
         protected void EnableFrameBuffer()
@@ -182,7 +153,5 @@ namespace Breadbox.Test.Vic2
         {
             Vic.PokeRegister(0x16, (Vic.PeekRegister(0x16) & 0xEF) | (value ? 0x10 : 0x00));
         }
-
-        protected int LastAccessedAddress { get; private set; }
     }
 }

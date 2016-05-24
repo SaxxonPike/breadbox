@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using BreadboxF;
+using NUnit.Framework;
 
 namespace Breadbox.Test.Vic2
 {
@@ -10,7 +8,13 @@ namespace Breadbox.Test.Vic2
     {
         protected override CommodoreVic2Configuration Config
         {
-            get { throw new NotImplementedException(); }
+            get { return new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration(); }
+        }
+
+        [Test]
+        public void RasterIrq()
+        {
+            // todo
         }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using BreadboxF;
-using FluentAssertions;
 using NUnit.Framework;
 
 namespace Breadbox.Test.Vic2.VideoOutput

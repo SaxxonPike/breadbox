@@ -60,6 +60,7 @@
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessPalBTests.cs" />
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessPalMTests.cs" />
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessPalNTests.cs" />
+    <Compile Include="Vic2\Timing\Vic2TimingBaseTestFixture.cs" />
     <Compile Include="Vic2\Vic2BadLineTests.cs" />
     <Compile Include="Vic2\Vic2BaseTestFixture.cs" />
     <Compile Include="Vic2\Vic2BorderTests.cs" />

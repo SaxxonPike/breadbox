@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using BreadboxF;
+﻿using BreadboxF;
 using FluentAssertions;
 using NUnit.Framework;
 
@@ -17,14 +13,14 @@ namespace Breadbox.Test.Vic2
         }
 
         [Test]
-        public void BadLineAndEnable([Values(true, false)] bool displayEnable, [Range(0, 7)] int yScroll)
+        public void BadLineAndEnable([Values(true, false)] bool displayEnable, [Range(0, 7)] int yScroll, [Random(0, 7, 2)] int yRaster)
         {
             // Arrange
             SetDisplayEnable(displayEnable);
             SetYScroll(yScroll);
 
             // Act
-            Vic.ClockToRasterY(0x30);
+            Vic.ClockToRasterY(0x30 + yRaster);
 
             // Assert
             Vic.BadLinesEnabled.Should().Be(displayEnable);
