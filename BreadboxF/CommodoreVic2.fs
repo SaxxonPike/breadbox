@@ -56,16 +56,18 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     // Utility
     // ========================================================================
 
+    let getValueFromBit index value =
+        if value then 1 <<< index else 0
 
     let getValueFromBits(arr:bool[]) =
-        (if arr.[0] then 0x01 else 0x00) |||
-        (if arr.[1] then 0x02 else 0x00) |||
-        (if arr.[2] then 0x04 else 0x00) |||
-        (if arr.[3] then 0x08 else 0x00) |||
-        (if arr.[4] then 0x10 else 0x00) |||
-        (if arr.[5] then 0x20 else 0x00) |||
-        (if arr.[6] then 0x40 else 0x00) |||
-        (if arr.[7] then 0x80 else 0x00)
+        (getValueFromBit 0 arr.[0]) |||
+        (getValueFromBit 1 arr.[1]) |||
+        (getValueFromBit 2 arr.[2]) |||
+        (getValueFromBit 3 arr.[3]) |||
+        (getValueFromBit 4 arr.[4]) |||
+        (getValueFromBit 5 arr.[5]) |||
+        (getValueFromBit 6 arr.[6]) |||
+        (getValueFromBit 7 arr.[7])
 
     let setBitsFromValue(arr:bool[], value) =
         arr.[0] <- (value &&& 0x01) <> 0
@@ -95,7 +97,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
 
     // MnX (00, 02, 04, 06, 08, 0A, 0C, 0E, 10)
     let mobX = Array.zeroCreate 8
-    let GetLowMobX (index) =
+    let GetLowMobX index =
         mobX.[index] &&& 0xFF
     let GetHighMobX () =
         ((mobX.[0] &&& 0x100) >>> 8) |||
@@ -106,9 +108,9 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
         ((mobX.[5] &&& 0x100) >>> 3) |||
         ((mobX.[6] &&& 0x100) >>> 2) |||
         ((mobX.[7] &&& 0x100) >>> 1)
-    let SetLowMobX (index, value) =
+    let SetLowMobX index value =
         mobX.[index] <- (mobX.[index] &&& 0x100) ||| (value &&& 0xFF)
-    let SetHighMobX (value) =
+    let SetHighMobX value =
         mobX.[0] <- (mobX.[0] &&& 0x0FF) ||| (if value &&& 0x01 <> 0 then 0x100 else 0x000)
         mobX.[1] <- (mobX.[1] &&& 0x0FF) ||| (if value &&& 0x02 <> 0 then 0x100 else 0x000)
         mobX.[2] <- (mobX.[2] &&& 0x0FF) ||| (if value &&& 0x04 <> 0 then 0x100 else 0x000)
@@ -120,21 +122,21 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
 
     // MxY (01, 03, 05, 07, 09, 0B, 0D, 0F)
     let mobY = Array.zeroCreate 8
-    let GetMobY (index) =
+    let GetMobY index =
         mobY.[index]
-    let SetMobY (index, value) =
+    let SetMobY index value =
         mobY.[index] <- value &&& 0xFF
 
     // RASTER/RST8 (11, 12) (high expects high bit in position 7 as if you wrote to the reg)
-    let mutable rasterY = config.RasterLinesPerFrame - 1
-    let nextRasterY = Array.init (config.RasterLinesPerFrame) (fun y ->
-        if y >= (config.RasterLinesPerFrame - 1) then 0 else (y + 1)
-        )
     let mutable rasterYCompareValue = 0
+    let SetLowRasterYCompareValue value =
+        rasterYCompareValue <- (rasterYCompareValue &&& 0x100) ||| value
+    let mutable rasterY =
+        config.RasterLinesPerFrame - 1
+    let nextRasterY =
+        Array.init config.RasterLinesPerFrame (fun y -> if y >= (config.RasterLinesPerFrame - 1) then 0 else (y + 1))
     let GetLowRasterY () =
         rasterY &&& 0x0FF
-    let SetLowRasterYCompareValue (value) =
-        rasterYCompareValue <- (rasterYCompareValue &&& 0x100) ||| value
 
     // Control register 1 (11) (RST8/ECM/BMM/DEN/RSEL/YSCROLL)
     let mutable extraColorMode = false
@@ -149,7 +151,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
         (if displayEnabled then 0x10 else 0x00) |||
         (if rowSelect then 0x08 else 0x00) |||
         yScroll
-    let SetControlRegister1 (value) =
+    let SetControlRegister1 value =
         rasterYCompareValue <- (rasterYCompareValue &&& 0x0FF) ||| ((value &&& 0x80) <<< 1)
         extraColorMode <- (value &&& 0x40 <> 0x00)
         bitmapMode <- (value &&& 0x20 <> 0x00)
@@ -161,21 +163,21 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     let mutable lightPenX = 0
     let GetLightPenX () =
         lightPenX
-    let SetLightPenX (value) =
+    let SetLightPenX value =
         lightPenX <- value >>> 1
 
     // LPY (14)
     let mutable lightPenY = 0
     let GetLightPenY () =
         lightPenY
-    let SetLightPenY (value) =
+    let SetLightPenY value =
         lightPenY <- value
 
     // MnE (15)
     let mobEnabled = Array.zeroCreate 8
     let GetMobEnable () =
         getValueFromBits(mobEnabled)
-    let SetMobEnable (value) =
+    let SetMobEnable value =
         setBitsFromValue(mobEnabled, value)
         
     // Control Register 2 (16)
@@ -189,7 +191,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
         (if multiColorMode then 0x10 else 0x00) |||
         (if columnSelect then 0x08 else 0x00) |||
         xScroll
-    let SetControlRegister2 (value) =
+    let SetControlRegister2 value =
         res <- (value &&& 0x20) <> 0x00
         multiColorMode <- (value &&& 0x10) <> 0x00
         columnSelect <- (value &&& 0x08) <> 0x00
@@ -200,7 +202,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     let mobYExpansionToggle = Array.zeroCreate 8
     let GetMobYExpansionEnable () =
         getValueFromBits(mobYExpansionEnabled)
-    let SetMobYExpansionEnable (value) =
+    let SetMobYExpansionEnable value =
         setBitsFromValue(mobYExpansionEnabled, value)
 
     // Memory Pointers (18) (VM and CB are pre-shifted on store for speed)
@@ -210,7 +212,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
         (videoMemoryPointer >>> 6) |||
         (characterBankPointer >>> 10) |||
         0x01
-    let SetMemoryPointers (value) =
+    let SetMemoryPointers value =
         videoMemoryPointer <- (value &&& 0xF0) <<< 6
         characterBankPointer <- (value &&& 0x0E) <<< 10
 
@@ -235,12 +237,12 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
         (if mobMobCollisionIrqEnabled then 0x04 else 0x00) |||
         (if mobBackgroundCollisionIrqEnabled then 0x02 else 0x00) |||
         (if rasterIrqEnabled then 0x01 else 0x00)
-    let SetInterruptRegister (value) =
+    let SetInterruptRegister value =
         lightPenIrq <- (lightPenIrq && ((value &&& 0x08) = 0))
         mobMobCollisionIrq <- (mobMobCollisionIrq && ((value &&& 0x04) = 0))
         mobBackgroundCollisionIrq <- (mobBackgroundCollisionIrq && ((value &&& 0x02) = 0))
         rasterIrq <- (rasterIrq && ((value &&& 0x01) = 0))
-    let SetInterruptEnable (value) =
+    let SetInterruptEnable value =
         lightPenIrqEnabled <- (value &&& 0x08) <> 0
         mobMobCollisionIrqEnabled <- (value &&& 0x04) <> 0
         mobBackgroundCollisionIrq <- (value &&& 0x02) <> 0
@@ -255,7 +257,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     let mobDataPriority = Array.zeroCreate 8
     let GetMobDataPriority () =
         getValueFromBits(mobDataPriority)
-    let SetMobDataPriority (value) =
+    let SetMobDataPriority value =
         setBitsFromValue(mobDataPriority, value)
 
     // Sprite Multicolor Enable (1C)
@@ -263,7 +265,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     let mobMultiColorToggle = Array.zeroCreate 8
     let GetMobMultiColorEnable () =
         getValueFromBits(mobMultiColorEnabled)
-    let SetMobMultiColorEnable (value) =
+    let SetMobMultiColorEnable value =
         setBitsFromValue(mobMultiColorEnabled, value)
     
     // Sprite X Expansion Enable (1D)
@@ -271,7 +273,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     let mobXExpansionToggle = Array.zeroCreate 8
     let GetMobXExpansionEnable () =
         getValueFromBits(mobXExpansionEnabled)
-    let SetMobXExpansionEnable (value) =
+    let SetMobXExpansionEnable value =
         setBitsFromValue(mobXExpansionEnabled, value)
 
     // Sprite-sprite Collision (1E)
@@ -300,28 +302,28 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     let mutable borderColor = 0
     let GetBorderColor () =
         borderColor ||| 0xF0
-    let SetBorderColor (value) =
+    let SetBorderColor value =
         borderColor <- value &&& 0x0F
 
     // Background Colors (21, 22, 23, 24)
     let backgroundColor = Array.zeroCreate 4
-    let GetBackgroundColor (index) =
+    let GetBackgroundColor index =
         backgroundColor.[index] ||| 0xF0
-    let SetBackgroundColor (index, value) =
+    let SetBackgroundColor index value =
         backgroundColor.[index] <- value &&& 0x0F
 
     // Sprite Multicolors (25, 26)
     let mobMultiColor = Array.zeroCreate 2
-    let GetMobMultiColor (index) =
+    let GetMobMultiColor index =
         mobMultiColor.[index] ||| 0xF0
-    let SetMobMultiColor (index, value) =
+    let SetMobMultiColor index value =
         mobMultiColor.[index] <- value &&& 0x0F
 
     // Sprite Colors (27, 28, 29, 2A, 2B, 2C, 2D, 2E)
     let mobColor = Array.zeroCreate 8
-    let GetMobColor (index) =
+    let GetMobColor index =
         mobColor.[index] ||| 0xF0
-    let SetMobColor (index, value) =
+    let SetMobColor index value =
         mobColor.[index] <- value &&& 0x0F
 
 
@@ -332,20 +334,18 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
 
     // Raster Line Counter
     // - This determines the Raster X position as well as all horizontal timed operations.
-    let rasterX = Array.init (config.RasterWidth) (fun counter ->
-        if (config.RasterWidth <= 0x200 || counter <= 0x18C) then
+    let rasterX = Array.init config.RasterWidth (fun counter ->
+        if config.RasterWidth <= 0x200 || counter <= 0x18C then
             counter
         else
             let extraCycles = config.RasterWidth - 0x200
             let adjustedCycle = counter - extraCycles
-            if (adjustedCycle < 0x18C) then
+            if adjustedCycle < 0x18C then
                 0x18C
             else
                 adjustedCycle
         )
-    let nextRasterLineCounter = Array.init (config.RasterWidth) (fun x ->
-        if x >= (config.RasterWidth - 1) then 0 else (x + 1)
-        )
+    let nextRasterLineCounter = Array.init config.RasterWidth (fun x -> if x >= (config.RasterWidth - 1) then 0 else (x + 1))
 
     let mutable rasterLineCounter = config.RasterIncrement - 1
     let GetRasterX () =
@@ -353,13 +353,13 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
 
     // Blanking
     // - The circuitry outputs black when blanked, so there's no need to render pixels.
-    let vBlankY = Array.init (config.RasterLinesPerFrame) (fun y ->
-        if (config.VBlankSet < config.VBlankClear) then
+    let vBlankY = Array.init config.RasterLinesPerFrame (fun y ->
+        if config.VBlankSet < config.VBlankClear then
             y >= config.VBlankSet && y < config.VBlankClear
         else
             y >= config.VBlankSet || y < config.VBlankClear
         )
-    let hBlankX = Array.init (config.RasterWidth) (fun x -> rasterX.[x] >= config.HBlankSet && rasterX.[x] < config.HBlankClear)
+    let hBlankX = Array.init config.RasterWidth (fun x -> rasterX.[x] >= config.HBlankSet && rasterX.[x] < config.HBlankClear)
 
     // Clocks
     let IsPhi0 () =
@@ -378,7 +378,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     //  48  First G fetch
     // 125  Last C fetch
     // 126  Last G fetch (NOTE: this overlaps 0 on PAL systems)
-    let memoryAccessCycle = Array.init (config.RasterWidth) (fun counter ->
+    let memoryAccessCycle = Array.init config.RasterWidth (fun counter ->
         if (counter % 4 <> 0) then
             -1
         else
@@ -400,16 +400,6 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     let mutable videoCounterBase = 0
     let mutable videoMatrixLineIndex = 0
     let videoMatrixLineMemory = Array.zeroCreate 40
-    let IncrementVideoCounter () =
-        videoCounter <- (videoCounter + 1) &&& 0x3FF
-        videoMatrixLineIndex <- (videoMatrixLineIndex + 1) &&& 0x3F
-    let IncrementVideoCounterBase () =
-        videoCounterBase <- videoCounter
-    let ResetVideoCounter () =
-        videoCounter <- videoCounterBase
-        videoMatrixLineIndex <- 0
-    let ResetVideoCounterBase () =
-        videoCounterBase <- 0
 
     // Graphics shift registers
     let mutable graphicsShiftRegister = 0
@@ -473,7 +463,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
     // 60: 10  PS   5:  26  PS  13: 42  R-  21: 58  GC  29: 74  GC  37: 90  GC  45: 106 GC  53: 122 GC
     // 61: 12  SS   6:  28  SS  14: 44  R-  22: 60  GC  30: 76  GC  38: 92  GC  46: 108 GC  54: 124 GC
     // 62: 14  PS   7:  30  PS  15: 46  RC  23: 62  GC  31: 78  GC  39: 94  GC  47: 110 GC
-    let ClockRasterCounter (mac, rasterX) =
+    let ClockRasterCounter mac rasterX =
         if rasterLineCounter = config.RasterIncrement then
             rasterY <- nextRasterY.[rasterY]
             if rasterY = 0x0F8 then
@@ -495,30 +485,30 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
             | 0 | 2 ->
                 // cycle 55-56
                 if mac = 0 then
-                    let toggleExpansionIfEnabled (index) =
+                    let toggleExpansionIfEnabled index =
                         mobYExpansionToggle.[index] <- mobYExpansionToggle.[index] <> mobYExpansionEnabled.[index]
-                    toggleExpansionIfEnabled(0)
-                    toggleExpansionIfEnabled(1)
-                    toggleExpansionIfEnabled(2)
-                    toggleExpansionIfEnabled(3)
-                    toggleExpansionIfEnabled(4)
-                    toggleExpansionIfEnabled(5)
-                    toggleExpansionIfEnabled(6)
-                    toggleExpansionIfEnabled(7)
+                    toggleExpansionIfEnabled 0
+                    toggleExpansionIfEnabled 1
+                    toggleExpansionIfEnabled 2
+                    toggleExpansionIfEnabled 3
+                    toggleExpansionIfEnabled 4
+                    toggleExpansionIfEnabled 5
+                    toggleExpansionIfEnabled 6
+                    toggleExpansionIfEnabled 7
                 let checkSpriteEnable (index) =
                     if mobEnabled.[index] && (mobY.[index] &&& 0x7) = (rasterY &&& 0x7) then
                         if not mobDma.[index] then
                             mobDma.[index] <- true
                             mobCounterBase.[index] <- 0
                             mobYExpansionToggle.[index] <- mobYExpansionToggle.[index] && (not mobYExpansionEnabled.[index])
-                checkSpriteEnable(0)
-                checkSpriteEnable(1)
-                checkSpriteEnable(2)
-                checkSpriteEnable(3)
-                checkSpriteEnable(4)
-                checkSpriteEnable(5)
-                checkSpriteEnable(6)
-                checkSpriteEnable(7)
+                checkSpriteEnable 0
+                checkSpriteEnable 1
+                checkSpriteEnable 2
+                checkSpriteEnable 3
+                checkSpriteEnable 4
+                checkSpriteEnable 5
+                checkSpriteEnable 6
+                checkSpriteEnable 7
             | 6 ->
                 // cycle 58
                 if rowCounter = 7 then
@@ -604,7 +594,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
                     else
                         0x3FFF
                 ) &&& 0xFF
-            IncrementVideoCounter()
+            videoCounter <- (videoCounter + 1) &&& 0x3FF
+            videoMatrixLineIndex <- (videoMatrixLineIndex + 1) &&& 0x3F
 
         let readI () =
             memory.Read(0x3FFF) |> ignore
@@ -864,7 +855,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
         let mac = GetMemoryAccessCycle()
         let rasterX = GetRasterX()
 
-        ClockRasterCounter(mac, rasterX)
+        ClockRasterCounter mac rasterX
         ClockBorder(mac)
         ClockBaAec(mac)
         ClockMemoryInterface(mac)
@@ -911,7 +902,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
 
 
     // Register Access
-    member this.PeekRegister (address) =
+    member this.PeekRegister address =
         match (address &&& 0x3F) with
             | 0x00 -> GetLowMobX(0)
             | 0x01 -> GetMobY(0)
@@ -962,68 +953,68 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:MemoryInterface
             | 0x2E -> GetMobColor(7)
             | _ -> 0xFF
 
-    member this.PokeRegister (address, value) =
-        match (address &&& 0x3F) with
-            | 0x00 -> SetLowMobX(0, value)
-            | 0x01 -> SetMobY(0, value)
-            | 0x02 -> SetLowMobX(1, value)
-            | 0x03 -> SetMobY(1, value)
-            | 0x04 -> SetLowMobX(2, value)
-            | 0x05 -> SetMobY(2, value)
-            | 0x06 -> SetLowMobX(3, value)
-            | 0x07 -> SetMobY(3, value)
-            | 0x08 -> SetLowMobX(4, value)
-            | 0x09 -> SetMobY(4, value)
-            | 0x0A -> SetLowMobX(5, value)
-            | 0x0B -> SetMobY(5, value)
-            | 0x0C -> SetLowMobX(6, value)
-            | 0x0D -> SetMobY(6, value)
-            | 0x0E -> SetLowMobX(7, value)
-            | 0x0F -> SetMobY(7, value)
-            | 0x10 -> SetHighMobX(value)
-            | 0x11 -> SetControlRegister1(value)
-            | 0x12 -> SetLowRasterYCompareValue(value)
-            | 0x15 -> SetMobEnable(value)
-            | 0x16 -> SetControlRegister2(value)
-            | 0x17 -> SetMobYExpansionEnable(value)
-            | 0x18 -> SetMemoryPointers(value)
-            | 0x19 -> SetInterruptRegister(value)
-            | 0x1A -> SetInterruptEnable(value)
-            | 0x1B -> SetMobDataPriority(value)
-            | 0x1C -> SetMobMultiColorEnable(value)
-            | 0x1D -> SetMobXExpansionEnable(value)
-            | 0x20 -> SetBorderColor(value)
-            | 0x21 -> SetBackgroundColor(0, value)
-            | 0x22 -> SetBackgroundColor(1, value)
-            | 0x23 -> SetBackgroundColor(2, value)
-            | 0x24 -> SetBackgroundColor(3, value)
-            | 0x25 -> SetMobMultiColor(0, value)
-            | 0x26 -> SetMobMultiColor(1, value)
-            | 0x27 -> SetMobColor(0, value)
-            | 0x28 -> SetMobColor(1, value)
-            | 0x29 -> SetMobColor(2, value)
-            | 0x2A -> SetMobColor(3, value)
-            | 0x2B -> SetMobColor(4, value)
-            | 0x2C -> SetMobColor(5, value)
-            | 0x2D -> SetMobColor(6, value)
-            | 0x2E -> SetMobColor(7, value)
+    member this.PokeRegister address value =
+        match address &&& 0x3F with
+            | 0x00 -> SetLowMobX 0 value
+            | 0x01 -> SetMobY 0 value
+            | 0x02 -> SetLowMobX 1 value
+            | 0x03 -> SetMobY 1 value
+            | 0x04 -> SetLowMobX 2 value
+            | 0x05 -> SetMobY 2 value
+            | 0x06 -> SetLowMobX 3 value
+            | 0x07 -> SetMobY 3 value
+            | 0x08 -> SetLowMobX 4 value
+            | 0x09 -> SetMobY 4 value
+            | 0x0A -> SetLowMobX 5 value
+            | 0x0B -> SetMobY 5 value
+            | 0x0C -> SetLowMobX 6 value
+            | 0x0D -> SetMobY 6 value
+            | 0x0E -> SetLowMobX 7 value
+            | 0x0F -> SetMobY 7 value
+            | 0x10 -> SetHighMobX value
+            | 0x11 -> SetControlRegister1 value
+            | 0x12 -> SetLowRasterYCompareValue value
+            | 0x15 -> SetMobEnable value
+            | 0x16 -> SetControlRegister2 value
+            | 0x17 -> SetMobYExpansionEnable value
+            | 0x18 -> SetMemoryPointers value
+            | 0x19 -> SetInterruptRegister value
+            | 0x1A -> SetInterruptEnable value
+            | 0x1B -> SetMobDataPriority value
+            | 0x1C -> SetMobMultiColorEnable value
+            | 0x1D -> SetMobXExpansionEnable value
+            | 0x20 -> SetBorderColor value
+            | 0x21 -> SetBackgroundColor 0 value
+            | 0x22 -> SetBackgroundColor 1 value
+            | 0x23 -> SetBackgroundColor 2 value
+            | 0x24 -> SetBackgroundColor 3 value
+            | 0x25 -> SetMobMultiColor 0 value
+            | 0x26 -> SetMobMultiColor 1 value
+            | 0x27 -> SetMobColor 0 value
+            | 0x28 -> SetMobColor 1 value
+            | 0x29 -> SetMobColor 2 value
+            | 0x2A -> SetMobColor 3 value
+            | 0x2B -> SetMobColor 4 value
+            | 0x2C -> SetMobColor 5 value
+            | 0x2D -> SetMobColor 6 value
+            | 0x2E -> SetMobColor 7 value
             | _ -> ()
 
-    member this.ReadRegister(address) =
-        match (address &&& 0x3F) with
+    member this.ReadRegister address =
+        match address &&& 0x3F with
             | 0x1E -> ClearAndGetMobMobCollision()
             | 0x1F -> ClearAndGetMobDataCollision()
-            | _ -> this.PeekRegister(address)
+            | _ -> this.PeekRegister address
 
-    member this.WriteRegister(address, value) =
-        match (address &&& 0x3F) with
+    member this.WriteRegister address value =
+        match address &&& 0x3F with
             | 0x13 | 0x14 | 0x1E | 0x1F -> ()
-            | _ -> this.PokeRegister(address, value)
+            | _ -> this.PokeRegister address value
 
     member this.TriggerLightPen() =
         if not lightPenTriggeredThisFrame then
-            SetLightPenX(GetRasterX())
-            SetLightPenY(rasterY)
+            SetLightPenX (GetRasterX())
+            SetLightPenY rasterY
             lightPenTriggeredThisFrame <- true
             lightPenIrq <- true
 
