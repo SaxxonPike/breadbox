@@ -5,14 +5,8 @@ using NUnit.Framework;
 namespace Breadbox.Test.Vic2
 {
     [TestFixture]
-    public class Vic2RasterCounterTests : Vic2BaseTestFixture
+    public class Vic2RasterCounterTests : Vic2RegionAgnosticBaseTestFixture
     {
-        protected override CommodoreVic2Configuration Config
-        {
-            get { return new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration(); }
-
-        }
-
         [Test]
         public void RasterLineCounter_AdvancesPerClock()
         {

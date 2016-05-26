@@ -66,7 +66,9 @@
     <Compile Include="Vic2\Vic2BorderTests.cs" />
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessBaseTestFixture.cs" />
     <Compile Include="Vic2\Vic2IrqTests.cs" />
+    <Compile Include="Vic2\Vic2PerformanceTests.cs" />
     <Compile Include="Vic2\Vic2RasterCounterTests.cs" />
+    <Compile Include="Vic2\Vic2RegionAgnosticBaseTestFixture.cs" />
     <Compile Include="Vic2\Vic2RegisterTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Vic2\VideoOutput\Vic2VideoOutputBaseTestFixture.cs" />

@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+﻿using BreadboxF;
+using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 
@@ -10,11 +11,11 @@ namespace Breadbox.Test.Vic2
         private int _address = 0;
         private int _memoryValue = 0;
 
-        [SetUp]
-        public void Configure()
+        protected override void SetUpMocks()
         {
             _address = -1;
             _memoryValue = 0;
+            MemoryMock = new Mock<IMemory>();
             MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(() => _memoryValue).Callback<int>(a => _address = a);
         }
 

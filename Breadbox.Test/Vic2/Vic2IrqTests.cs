@@ -4,13 +4,8 @@ using NUnit.Framework;
 
 namespace Breadbox.Test.Vic2
 {
-    public class Vic2IrqTests : Vic2BaseTestFixture
+    public class Vic2IrqTests : Vic2RegionAgnosticBaseTestFixture
     {
-        protected override CommodoreVic2Configuration Config
-        {
-            get { return new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration(); }
-        }
-
         [Test]
         public void RasterIrq()
         {

@@ -7,13 +7,8 @@ using NUnit.Framework;
 namespace Breadbox.Test.Vic2
 {
     [TestFixture]
-    public class Vic2RegisterTests : Vic2BaseTestFixture
+    public class Vic2RegisterTests : Vic2RegionAgnosticBaseTestFixture
     {
-        protected override CommodoreVic2Configuration Config
-        {
-            get { return new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration(); }
-        }
-
         private void TestSpriteRegister(int register, int value, Func<int, bool> test)
         {
             // Arrange

@@ -5,13 +5,8 @@ using NUnit.Framework;
 namespace Breadbox.Test.Vic2
 {
     [TestFixture]
-    public class Vic2BadLineTests : Vic2BaseTestFixture
+    public class Vic2BadLineTests : Vic2RegionAgnosticBaseTestFixture
     {
-        protected override CommodoreVic2Configuration Config
-        {
-            get { return new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration(); }
-        }
-
         [Test]
         public void BadLineAndEnable([Values(true, false)] bool displayEnable, [Range(0, 7)] int yScroll, [Random(0, 7, 2)] int yRaster)
         {

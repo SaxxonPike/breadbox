@@ -5,13 +5,8 @@ using NUnit.Framework;
 namespace Breadbox.Test.Vic2
 {
     [TestFixture]
-    public class Vic2BorderTests : Vic2BaseTestFixture
+    public class Vic2BorderTests : Vic2RegionAgnosticBaseTestFixture
     {
-        protected override CommodoreVic2Configuration Config
-        {
-            get { return new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration(); }
-        }
-
         private const int TopRowSelectOff = 0x037;
         private const int TopRowSelectOn = 0x033;
         private const int BottomRowSelectOff = 0x0F7;

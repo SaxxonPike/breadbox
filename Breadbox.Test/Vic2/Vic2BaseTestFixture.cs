@@ -10,26 +10,24 @@ namespace Breadbox.Test.Vic2
     public abstract class Vic2BaseTestFixture
     {
         private CommodoreVic2Configuration _config;
-        private int[] _frameBuffer;
-        private int _frameBufferIndex;
-
         private Stopwatch _stopwatch;
 
-        protected Mock<CommodoreVic2ClockInterface> ClockMock;
-        protected Mock<MemoryInterface> MemoryMock;
-        protected Mock<CommodoreVic2VideoInterface> VideoMock;
+        protected Mock<IClock> ClockMockPhi1;
+        protected Mock<IClock> ClockMockPhi2;
+        protected Mock<IMemory> MemoryMock;
         protected CommodoreVic2Chip Vic { get; private set; }
 
         [SetUp]
         public void Initialize()
         {
             _config = Config;
-
-            ClockMock = new Mock<CommodoreVic2ClockInterface>();
-            MemoryMock = new Mock<MemoryInterface>();
-            VideoMock = new Mock<CommodoreVic2VideoInterface>();
             SetUpMocks();
-            Vic = new CommodoreVic2Chip(_config, MemoryMock.Object, VideoMock.Object, ClockMock.Object);
+
+            var memory = MemoryMock != null ? MemoryMock.Object : new MemoryNull();
+            var clockPhi1 = ClockMockPhi1 != null ? ClockMockPhi1.Object : new ClockNull();
+            var clockPhi2 = ClockMockPhi2 != null ? ClockMockPhi2.Object : new ClockNull();
+
+            Vic = new CommodoreVic2Chip(_config, memory, clockPhi1, clockPhi2);
             _stopwatch = new Stopwatch();
             _stopwatch.Start();
         }
@@ -39,59 +37,12 @@ namespace Breadbox.Test.Vic2
         {
             _stopwatch.Stop();
             Console.WriteLine("Elapsed time: {0}ms", _stopwatch.ElapsedMilliseconds);
-            PixelsOutputToFrameBuffer = 0;
-            _frameBuffer = null;
-            _frameBufferIndex = 0;
         }
 
         protected abstract CommodoreVic2Configuration Config { get; }
 
         protected virtual void SetUpMocks()
         {
-            ClockMock.Setup(m => m.ClockPhi1());
-            ClockMock.Setup(m => m.ClockPhi2());
-            MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(0x00);
-            MemoryMock.Setup(m => m.Write(It.IsAny<int>(), It.IsAny<int>()));
-            VideoMock.Setup(m => m.Output(It.IsAny<CommodoreVic2VideoOutput>()));
-        }
-
-        protected void EnableFrameBuffer()
-        {
-            if (_frameBuffer != null) return;
-
-            PixelsOutputToFrameBuffer = 0;
-            var width = _config.VisiblePixelsPerRasterLine;
-            var height = _config.VisibleRasterLines;
-            var total = height*width;
-            _frameBuffer = new int[total];
-
-            VideoMock.Setup(m => m.Output(It.IsAny<CommodoreVic2VideoOutput>()))
-                .Callback<CommodoreVic2VideoOutput>(output =>
-                {
-                    if (!output.VBlank && !output.HBlank)
-                    {
-                        _frameBuffer[_frameBufferIndex++] = output.Pixel;
-                        PixelsOutputToFrameBuffer++;
-                        if (_frameBufferIndex > total)
-                        {
-                            _frameBufferIndex = 0;
-                        }
-                    }
-                });
-        }
-
-        protected int[] GetFrameBuffer()
-        {
-            var result = new int[_frameBuffer.Length];
-            Array.Copy(_frameBuffer, result, result.Length);
-            return result;
-        }
-
-        protected int PixelsOutputToFrameBuffer { get; private set; }
-
-        protected int FrameBufferAt(int x, int y)
-        {
-            return _frameBuffer[x + (y * _config.RasterWidth)];
         }
 
         protected void SetBorderColor(int color)
