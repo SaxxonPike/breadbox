@@ -8,11 +8,11 @@
     <ProjectGuid>aa8601c2-2f4e-4720-8868-297745913a14</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>BreadboxF</RootNamespace>
-    <AssemblyName>BreadboxF</AssemblyName>
+    <AssemblyName>Breadbox</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Name>BreadboxF</Name>
+    <Name>Breadbox</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -22,7 +22,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\BreadboxF.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\Breadbox.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>

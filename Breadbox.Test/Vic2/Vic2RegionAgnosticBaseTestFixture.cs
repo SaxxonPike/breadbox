@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using BreadboxF;
 using NUnit.Framework;
 
 namespace Breadbox.Test.Vic2
@@ -20,13 +16,30 @@ namespace Breadbox.Test.Vic2
             var rng = new Random();
             var options = new[]
             {
-                new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration(),
-                new CommodoreVic2ConfigurationFactory().CreateOldNtscConfiguration(),
-                new CommodoreVic2ConfigurationFactory().CreatePalBConfiguration(),
-                new CommodoreVic2ConfigurationFactory().CreatePalNConfiguration(),
-                new CommodoreVic2ConfigurationFactory().CreatePalMConfiguration()
+                new {
+                    Name = "New NTSC",
+                    Config = new CommodoreVic2ConfigurationFactory().CreateNewNtscConfiguration()
+                },
+                new {
+                    Name = "Old NTSC",
+                    Config = new CommodoreVic2ConfigurationFactory().CreateOldNtscConfiguration()
+                },
+                new {
+                    Name = "PAL-B",
+                    Config = new CommodoreVic2ConfigurationFactory().CreatePalBConfiguration()
+                },
+                new {
+                    Name = "PAL-N",
+                    Config = new CommodoreVic2ConfigurationFactory().CreatePalNConfiguration()
+                },
+                new {
+                    Name = "PAL-M",
+                    Config = new CommodoreVic2ConfigurationFactory().CreatePalMConfiguration()
+                },
             };
-            return options[rng.Next(options.Length)];
+            var choice = options[rng.Next(options.Length)];
+            Console.WriteLine("Randomly chose config: {0}", choice.Name);
+            return choice.Config;
         }
 
 

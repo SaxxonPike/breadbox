@@ -1,8 +1,7 @@
-﻿using BreadboxF;
-using FluentAssertions;
+﻿using FluentAssertions;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Vic2
+namespace Breadbox.Test.Vic2.Border
 {
     [TestFixture]
     public class Vic2BorderTests : Vic2RegionAgnosticBaseTestFixture
@@ -179,7 +178,7 @@ namespace Breadbox.Test.Vic2
             SetColumnSelect(false);
 
             // Act
-            Vic.ClockTo(0x40, GetLeftX(false) + 1);
+            Vic.ClockTo(GetLeftX(true) + 1, 0x40);
             SetColumnSelect(true);
             Vic.ClockMultiple(16);
 
@@ -195,7 +194,7 @@ namespace Breadbox.Test.Vic2
             SetColumnSelect(true);
 
             // Act
-            Vic.ClockTo(0x40, GetRightX(true) - 1);
+            Vic.ClockTo(GetRightX(true) - 1, 0x40);
             SetColumnSelect(false);
             Vic.ClockMultiple(16);
 

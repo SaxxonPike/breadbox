@@ -1,4 +1,4 @@
-﻿namespace BreadboxF
+﻿namespace Breadbox
 
 type CommodoreSidFilterInterface =
     abstract member Sample: int -> int

@@ -1,4 +1,4 @@
-﻿namespace BreadboxF
+﻿namespace Breadbox
 
 type IMemory =
     abstract member Read: int -> int

@@ -1,9 +1,8 @@
-﻿using BreadboxF;
-using FluentAssertions;
+﻿using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Vic2
+namespace Breadbox.Test.Vic2.MemoryAccess
 {
     [TestFixture]
     public abstract class Vic2MemoryAccessBaseTestFixture : Vic2BaseTestFixture

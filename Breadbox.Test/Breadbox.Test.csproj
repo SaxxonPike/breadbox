@@ -82,12 +82,8 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BreadboxF\BreadboxF.fsproj">
+    <ProjectReference Include="..\BreadboxF\Breadbox.fsproj">
       <Project>{aa8601c2-2f4e-4720-8868-297745913a14}</Project>
-      <Name>BreadboxF</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Breadbox\Breadbox.csproj">
-      <Project>{232eeb40-3315-4d66-99c6-9409d1186328}</Project>
       <Name>Breadbox</Name>
     </ProjectReference>
   </ItemGroup>
