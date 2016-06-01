@@ -55,6 +55,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cpu6502\Cpu6502BaseTestFixture.cs" />
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessNewNtscTests.cs" />
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessOldNtscTests.cs" />
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessPalBTests.cs" />

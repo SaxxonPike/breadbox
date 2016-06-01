@@ -1,7 +1,7 @@
 ﻿using FluentAssertions;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Vic2.Border
+namespace Breadbox.Test.Vic2
 {
     [TestFixture]
     public class Vic2BorderTests : Vic2RegionAgnosticBaseTestFixture

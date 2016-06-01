@@ -1439,7 +1439,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
         // ----- Execution -----
 
 
-        let executed = 
+        let code = 
             match microCode.[opcode].[mi] with
                 | Uop.Fetch1 -> Fetch1
                 | Uop.Fetch1Real -> Fetch1Real
@@ -1672,6 +1672,18 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
                 | Uop.EndBranchSpecial -> EndBranchSpecial
                 | _ -> fun _ -> ReadMemory 0xFFFF ignore |> ignore; false
 
-        if executed() then
+        let executed = code()
+        if executed then
             mi <- mi + 1
         ()
+
+
+    // ----- Interface -----
+
+
+    member this.Clock () = ExecuteOneRetry()
+    member this.ClockMultiple count =
+        let mutable remaining = count
+        while remaining > 0 do
+            ExecuteOneRetry()
+            remaining <- remaining - 1
