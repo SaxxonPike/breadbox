@@ -589,7 +589,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             // 105 (VOP_IRQ)
             [| Uop.FetchDummy; Uop.FetchDummy; Uop.PushPch; Uop.PushPcl; Uop.PushPIrq; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
             // 106 (VOP_RESET)
-            [| Uop.FetchDummy; Uop.FetchDummy; Uop.PushDummy; Uop.PushDummy; Uop.PushPReset; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
+            [| Uop.FetchDummy; Uop.FetchDummy; Uop.FetchDummy; Uop.PushDummy; Uop.PushDummy; Uop.PushPReset; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
             // 107 (VOP_Fetch1_NoInterrupt)
             [| Uop.Fetch1Real |];
         |]
@@ -660,37 +660,39 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             z <- (value &&& 0xFF) = 0
             n <- (value &&& 0x80) <> 0
 
-        let ReadMemory address =
-            memory.Read(address)
+        let ReadMemoryInternal address =
+            memory.Read address
 
-        let WriteMemory address value =
+        let ReadMemory address operation =
+            if rdy then
+                ReadMemoryInternal address |> operation
+            rdy
+
+        let WriteMemory address value operation =
             memory.Write(address, value)
-            value
+            value |> operation
+            true
 
-        let ReadMemoryPcIncrement () =
-            let result = ReadMemory pc
-            pc <- pc + 1
-            result
+        let ReadMemoryPcIncrement operation =
+            ReadMemory pc (fun mem ->
+                pc <- pc + 1
+                mem |> operation)
 
-        let ReadMemoryS () =
-            ReadMemory (0x100 ||| s)
+        let ReadMemoryS operation =
+            ReadMemory (0x100 ||| s) operation
 
-        let WriteMemoryS value =
-            value |> WriteMemory (0x100 ||| s) |> ignore
+        let WriteMemoryS value operation =
+            WriteMemory (0x100 ||| s) value operation
 
-        let DecrementS () =
-            s <- (s - 1 &&& 0xFF)
+        let Push value operation =
+            WriteMemoryS value (fun mem ->
+                mem |> operation
+                s <- (s - 1 &&& 0xFF))
 
-        let IncrementS () =
-            s <- (s + 1 &&& 0xFF)
-
-        let Push value =
-            value |> WriteMemoryS
-            DecrementS()
-
-        let Pull () =
-            IncrementS()
-            ReadMemoryS()
+        let Pull operation =
+            ReadMemoryS (fun mem ->
+                mem |> operation
+                s <- (s + 1 &&& 0xFF))
 
         let GetP () =
             0x20 |||
@@ -710,6 +712,32 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             i <- (value &&& 0x04) <> 0
             z <- (value &&& 0x02) <> 0
             c <- (value &&& 0x01) <> 0
+
+        let GetPcl () = pc &&& 0xFF
+        let GetPch () = pc >>> 8
+        let SetPc low high = pc <- (high <<< 8) ||| low
+        let SetPcl value = pc <- (pc &&& 0xFF00) ||| value
+        let SetPch value = pc <- (pc &&& 0x00FF) ||| (value <<< 8)
+        let SetA value =
+            a <- value
+        let SetNZA value =
+            SetA value
+            NZ a
+        let SetX value =
+            x <- value
+        let SetNZX value =
+            SetX value
+            NZ x
+        let SetY value =
+            y <- value
+        let SetNZY value =
+            SetY value
+            NZ y
+        let SetAlu value =
+            aluTemp <- value
+        let SetNZAlu value =
+            SetAlu value
+            NZ aluTemp
 
         let IfReady action =
             if rdy then
@@ -936,15 +964,17 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
         // ----- uOPS -----
 
 
-        let FetchDummy () =
-            ReadMemory pc |> ignore
+        let FetchDummy operation =
+            ReadMemory pc (fun mem -> operation)
+
+        let Fetch1RealInternal () =
+            opcode <- ReadMemoryInternal pc
+            branchIrqHack <- false
+            mi <- -1
+            pc <- (pc + 1) &&& 0xFFFF
 
         let Fetch1Real () =
-            IfReady <| (
-                branchIrqHack <- false
-                opcode <- ReadMemoryPcIncrement()
-                pc <- pc + 1
-                mi <- -1)
+            IfReady <| Fetch1RealInternal()
 
         let Fetch1 () =
             IfReady <| (
@@ -965,345 +995,204 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
                             mi <- 0
                             ExecuteOneRetry()
                 else
-                    Fetch1Real |> ignore
+                    Fetch1Real() |> ignore
             )
 
         let Fetch2 () =
-            if rdy then
-                opcode2 <- ReadMemoryPcIncrement()
+            ReadMemoryPcIncrement <| fun value -> opcode2 <- value
 
         let Fetch3 () =
-            if rdy then
-                opcode3 <- ReadMemoryPcIncrement()
+            ReadMemoryPcIncrement <| fun value -> opcode3 <- value
 
         let PushPch () =
-            pc >>> 8 |> WriteMemoryS
-            DecrementS()
+            Push (GetPch()) ignore
 
         let PushPcl () =
-            WriteMemoryS pc
-            DecrementS()
+            Push (GetPcl()) ignore
+
+        let PushPInterrupt newB newEa =
+            b <- newB
+            Push (GetP()) <| (fun value ->
+                i <- true
+                ea <- newEa)
 
         let PushPBrk () =
-            b <- true
-            GetP() |> WriteMemoryS
-            i <- true
-            ea <- brkVector
+            PushPInterrupt true brkVector
 
         let PushPIrq () =
-            b <- false
-            GetP() |> WriteMemoryS
-            i <- true
-            ea <- irqVector
+            PushPInterrupt false irqVector
             
         let PushPNmi () =
-            b <- false
-            GetP() |> WriteMemoryS
-            i <- true
-            ea <- nmiVector
+            PushPInterrupt false nmiVector
 
         let PushPReset () =
-            ea <- resetVector
-            DecrementS()
-            i <- true
+            PushPInterrupt false resetVector
 
         let PushDummy () =
-            DecrementS()
+            IfReady <| s <- (s - 1) &&& 0xFF
 
         let FetchPclVector () =
-            if rdy then
+            IfReady <| (
                 if nmi && ((ea = brkVector && b) || (ea = irqVector && (not b))) then
                     nmi <- false
                     ea <- nmiVector
-                aluTemp <- ReadMemory ea
-            rdy
+                aluTemp <- ReadMemoryInternal ea)
             
         let FetchPchVector () =
-            if rdy then
-                aluTemp <- aluTemp ||| (ReadMemory(ea) <<< 8)
-                pc <- aluTemp
-            rdy
+            IfReady <| (
+                aluTemp <- aluTemp ||| (ReadMemoryInternal(ea) <<< 8)
+                pc <- aluTemp)
 
         let ImpIny () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 y <- y + 1
-                NZ y
-            rdy
+                NZ y)
 
         let ImpDey () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 y <- y - 1
-                NZ y
-            rdy
+                NZ y)
             
         let ImpInx () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 x <- x + 1
-                NZ x
-            rdy
+                NZ x)
 
         let ImpDex () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 x <- x - 1
-                NZ x
-            rdy
+                NZ x)
 
         let ImpTsx () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 x <- s
-                NZ x
-            rdy
+                NZ x)
 
         let ImpTxs () =
-            if rdy then
-                FetchDummy()
-                s <- x
-            rdy
+            FetchDummy <| (
+                s <- x)
 
         let ImpTax () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 x <- a
-                NZ x
-            rdy
+                NZ x)
 
         let ImpTay () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 y <- a
-                NZ y
-            rdy
+                NZ x)
             
         let ImpTya () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 a <- y
-                NZ a
-            rdy
+                NZ a)
         
         let ImpTxa () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 a <- x
-                NZ a
-            rdy
+                NZ a)
 
-        let ImpSei () =
-            if rdy then
-                FetchDummy()
-                iFlagPending <- true
-            rdy
-
-        let ImpCli () =
-            if rdy then
-                FetchDummy()
-                iFlagPending <- false
-            rdy
-
-        let ImpSec () =
-            if rdy then
-                FetchDummy()
-                c <- true
-            rdy
-
-        let ImpClc () =
-            if rdy then
-                FetchDummy()
-                c <- false
-            rdy
+        let ImpSei () = FetchDummy <| iFlagPending <- true
+        let ImpCli () = FetchDummy <| iFlagPending <- false
+        let ImpSec () = FetchDummy <| c <- true
+        let ImpClc () = FetchDummy <| c <- false
+        let ImpClv () = FetchDummy <| v <- false
 
         let ImpSed () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 d <- true
-                isDecimalMode <- config.HasDecimalMode
-            rdy
+                isDecimalMode <- config.HasDecimalMode)
 
         let ImpCld () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 d <- false
-                isDecimalMode <- false
-            rdy
+                isDecimalMode <- false)
 
-        let ImpClv () =
-            if rdy then
-                FetchDummy()
-                v <- false
-            rdy
+        let AbsWrite value = WriteMemory ((opcode3 <<< 8) ||| opcode2) value
+        let AbsWriteSta () = AbsWrite a
+        let AbsWriteStx () = AbsWrite x
+        let AbsWriteSty () = AbsWrite y
+        let AbsWriteSax () = AbsWrite (x &&& a)
 
-        let AbsWrite value =
-            (opcode3 <<< 8) ||| opcode2 |> WriteMemory value |> ignore
-            true
-
-        let AbsWriteSta () =
-            AbsWrite a
-
-        let AbsWriteStx () =
-            AbsWrite x
-            
-        let AbsWriteSty () =
-            AbsWrite y
-
-        let AbsWriteSax () =
-            AbsWrite (x &&& a)
-
-        let ZpWrite value =
-            value |> WriteMemory opcode2 |> ignore
-            true
-
-        let ZpWriteSta () =
-            ZpWrite a
-
-        let ZpWriteStx () =
-            ZpWrite x
-
-        let ZpWriteSty () =
-            ZpWrite y
-
-        let ZpWriteSax () =
-            ZpWrite (x &&& a)
+        let ZpWrite value = WriteMemory opcode2 value
+        let ZpWriteSta () = ZpWrite a
+        let ZpWriteStx () = ZpWrite x
+        let ZpWriteSty () = ZpWrite y
+        let ZpWriteSax () = ZpWrite (x &&& a)
 
         let IndIdxStage3 () =
-            if rdy then
-                ea <- ReadMemory opcode2
-            rdy
+            ReadMemory opcode2 (fun mem ->
+                ea <- mem)
 
         let IndIdxStage4 () =
-            if rdy then
+            IfReady <| (
                 aluTemp <- ea + y
-                ea <- (((opcode2 + 1) &&& 0xFF) <<< 8) ||| (aluTemp &&& 0xFF) |> ReadMemory
-            rdy
+                ea <- (((opcode2 + 1) &&& 0xFF) <<< 8) ||| (aluTemp &&& 0xFF) |> ReadMemoryInternal)
 
         let IndIdxWriteStage5 () =
-            if rdy then
-                ReadMemory ea |> ignore
-                ea <- ea + (aluTemp &&& 0xFF00)
-            rdy
+            IfReady <| (
+                ReadMemoryInternal ea |> ignore
+                ea <- ea + (aluTemp &&& 0xFF00))
 
         let IndIdxReadStage5 () =
-            if rdy then
+            IfReady <| (
                 if aluTemp >= 0x100 then
                     mi <- mi + 1
-                    ExecuteOneRetry |> ignore
+                    ExecuteOneRetry()
                 else
-                    ReadMemory ea |> ignore
-                    ea <- (ea + 0x100) &&& 0xFFFF
-            rdy
+                    ReadMemoryInternal ea |> ignore
+                    ea <- (ea + 0x100) &&& 0xFFFF)
 
         let IndIdxRmwStage5 () =
-            if rdy then
+            IfReady <| (
                 if aluTemp >= 0x100 then
                     ea <- (ea + 0x100) &&& 0xFFFF
-                ReadMemory ea |> ignore
-            rdy
+                ReadMemoryInternal ea |> ignore)
 
-        let IndIdxWriteStage6 value =
-            value |> WriteMemory ea |> ignore
-            true
+        let IndIdxWriteStage6 value = WriteMemory ea value ignore
+        let IndIdxWriteStage6Sta () = IndIdxWriteStage6 a
+        let IndIdxWriteStage6Sha () = IndIdxWriteStage6 (a &&& x &&& 7)
 
-        let IndIdxWriteStage6Sta () =
-            IndIdxWriteStage6 a
+        let IndIdxReadStage6 operation = ReadMemory ea operation
+        let IndIdxReadStage6Lda () = IndIdxReadStage6 <| Lda
+        let IndIdxReadStage6Cmp () = IndIdxReadStage6 <| Cmp a
+        let IndIdxReadStage6And () = IndIdxReadStage6 <| And
+        let IndIdxReadStage6Eor () = IndIdxReadStage6 <| Eor
+        let IndIdxReadStage6Lax () = IndIdxReadStage6 <| Lax
+        let IndIdxReadStage6Adc () = IndIdxReadStage6 <| Adc
+        let IndIdxReadStage6Sbc () = IndIdxReadStage6 <| Sbc
+        let IndIdxReadStage6Ora () = IndIdxReadStage6 <| Ora
 
-        let IndIdxWriteStage6Sha () =
-            IndIdxWriteStage6 (a &&& x &&& 7)
+        let IndIdxRmwStage6 () = ReadMemory ea (fun mem -> aluTemp <- mem)
 
-        let IndIdxReadStage6 operation =
-            IfReady <| (ReadMemory ea |> operation)
+        let IndIdxRmwStage7 operation = WriteMemory ea aluTemp operation
+        let IndIdxRmwStage7Slo () = IndIdxRmwStage7 <| Slo
+        let IndIdxRmwStage7Sre () = IndIdxRmwStage7 <| Sre
+        let IndIdxRmwStage7Rra () = IndIdxRmwStage7 <| Rra
+        let IndIdxRmwStage7Isc () = IndIdxRmwStage7 <| Isc
+        let IndIdxRmwStage7Dcp () = IndIdxRmwStage7 <| Dcp
+        let IndIdxRmwStage7Rla () = IndIdxRmwStage7 <| Rla
 
-        let IndIdxReadStage6Lda () =
-            IndIdxReadStage6 <| Lda
-
-        let IndIdxReadStage6Cmp () =
-            IndIdxReadStage6 <| Cmp a
-
-        let IndIdxReadStage6And () =
-            IndIdxReadStage6 <| And
-
-        let IndIdxReadStage6Eor () =
-            IndIdxReadStage6 <| Eor
-
-        let IndIdxReadStage6Lax () =
-            IndIdxReadStage6 <| Lax
-
-        let IndIdxReadStage6Adc () =
-            IndIdxReadStage6 <| Adc
-
-        let IndIdxReadStage6Sbc () =
-            IndIdxReadStage6 <| Sbc
-
-        let IndIdxReadStage6Ora () =
-            IndIdxReadStage6 <| Ora
-
-        let IndIdxRmwStage6 () =
-            IfReady <| (aluTemp <- ReadMemory ea)
-
-        let IndIdxRmwStage7 operation =
-            aluTemp |> WriteMemory ea |> operation |> ignore
-            true
-
-        let IndIdxRmwStage7Slo () =
-            IndIdxRmwStage7 <| Slo
-
-        let IndIdxRmwStage7Sre () =
-            IndIdxRmwStage7 <| Sre
-
-        let IndIdxRmwStage7Rra () =
-            IndIdxRmwStage7 <| Rra
-
-        let IndIdxRmwStage7Isc () =
-            IndIdxRmwStage7 <| Isc
-
-        let IndIdxRmwStage7Dcp () =
-            IndIdxRmwStage7 <| Dcp
-
-        let IndIdxRmwStage7Rla () =
-            IndIdxRmwStage7 <| Rla
-
-        let IndIdxRmwStage8 () =
-            aluTemp |> WriteMemory ea |> ignore
-            true
+        let IndIdxRmwStage8 () = WriteMemory ea aluTemp ignore
 
         let RelBranchStage2 branchTaken =
-            if rdy then
-                opcode2 <- ReadMemoryPcIncrement()
+            ReadMemoryPcIncrement (fun mem ->
+                opcode2 <- mem
                 if branchTaken then
                     opcode <- vopRelativeStuff
-                    mi <- -1
-            rdy
+                    mi <- -1)
             
-        let RelBranchStage2Bvs () =
-            RelBranchStage2 v
-
-        let RelBranchStage2Bvc () =
-            RelBranchStage2 (not v)
-
-        let RelBranchStage2Bmi () =
-            RelBranchStage2 n
-
-        let RelBranchStage2Bpl () =
-            RelBranchStage2 (not n)
-
-        let RelBranchStage2Bcs () =
-            RelBranchStage2 c
-
-        let RelBranchStage2Bcc () =
-            RelBranchStage2 (not c)
-
-        let RelBranchStage2Beq () =
-            RelBranchStage2 z
-
-        let RelBranchStage2Bne () =
-            RelBranchStage2 (not z)
+        let RelBranchStage2Bvs () = RelBranchStage2 v
+        let RelBranchStage2Bvc () = RelBranchStage2 (not v)
+        let RelBranchStage2Bmi () = RelBranchStage2 n
+        let RelBranchStage2Bpl () = RelBranchStage2 (not n)
+        let RelBranchStage2Bcs () = RelBranchStage2 c
+        let RelBranchStage2Bcc () = RelBranchStage2 (not c)
+        let RelBranchStage2Beq () = RelBranchStage2 z
+        let RelBranchStage2Bne () = RelBranchStage2 (not z)
 
         let RelBranchStage3 () =
-            if rdy then
-                FetchDummy()
+            FetchDummy <| (
                 aluTemp <- (pc &&& 0xFF) + opcode2
                 pc <- (pc &&& 0xFF00) ||| (aluTemp &&& 0xFF)
                 if aluTemp >= 0x100 then
@@ -1311,129 +1200,44 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
                     mi <- -1
                 else
                     if interruptPending then
-                        branchIrqHack <- true
-            rdy
+                        branchIrqHack <- true)
 
         let RelBranchStage4 () =
-            if rdy then
-                FetchDummy()
-                pc <- (pc + (if aluTemp < 0 then -256 else 256)) &&& 0xFFFF
-            rdy
+            FetchDummy <| (
+                pc <- (pc + (if aluTemp < 0 then -256 else 256)) &&& 0xFFFF)
 
-        let Nop () =
-            if rdy then
-                FetchDummy()
-            rdy
-
-        let DecS () =
-            if rdy then
-                FetchDummy()
-                DecrementS()
-            rdy
-
-        let IncS () =
-            if rdy then
-                FetchDummy()
-                IncrementS()
-            rdy
+        let Nop () = FetchDummy
+        let DecS () = FetchDummy <| s <- (s - 1) &&& 0xFF
+        let IncS () = FetchDummy <| s <- (s + 1) &&& 0xFF
 
         let Jsr () =
-            if rdy then
-                pc <- (ReadMemory(pc) <<< 8) ||| opcode2
-            rdy
+            ReadMemory pc (fun mem ->
+                pc <- (mem <<< 8) ||| opcode2)
 
-        let PullP () =
-            if rdy then
-                ReadMemoryS() |> SetP
-                IncrementS()
-            rdy
+        let PullP () = ReadMemoryS SetP
 
         let PullPcl () =
-            if rdy then
-                pc <- (pc &&& 0xFF00) ||| ReadMemoryS()
-                IncrementS()
-            rdy
+            ReadMemoryS (fun mem -> 
+                pc <- (pc &&& 0xFF00) ||| mem)
 
         let PullPchNoInc () =
-            if rdy then
-                pc <- (pc &&& 0x00FF) ||| (ReadMemoryS() <<< 8)
-            rdy
+            IfReady <| pc <- (pc &&& 0x00FF) ||| (ReadMemoryInternal(0x0100 ||| s) <<< 8)
 
-        let AbsReadLda () =
-            if rdy then
-                a <- ReadMemory((opcode3 <<< 8) ||| opcode2)
-                NZ a
-            rdy
-
-        let AbsReadLdy () =
-            if rdy then
-                y <- ReadMemory((opcode3 <<< 8) ||| opcode2)
-                NZ y
-            rdy
-
-        let AbsReadLdx () =
-            if rdy then
-                x <- ReadMemory((opcode3 <<< 8) ||| opcode2)
-                NZ x
-            rdy
-
-        let AbsReadBit () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> Bit
-            rdy
-
-        let AbsReadLax () =
-            if rdy then
-                aluTemp <- ReadMemory((opcode3 <<< 8) ||| opcode2)
-                a <- aluTemp
-                x <- a
-                NZ a
-            rdy
-
-        let AbsReadAnd () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> And
-            rdy
-
-        let AbsReadEor () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> Eor
-            rdy
-
-        let AbsReadOra () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> Ora
-            rdy
-
-        let AbsReadAdc () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> Adc
-            rdy
-
-        let AbsReadCmp () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> Cmp a
-            rdy
-
-        let AbsReadCpy () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> Cmp y
-            rdy
-
-        let AbsReadNop () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> ignore
-            rdy
-
-        let AbsReadCpx () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> Cmp x
-            rdy
-
-        let AbsReadSbc () =
-            if rdy then
-                ReadMemory((opcode3 <<< 8) ||| opcode2) |> Sbc
-            rdy
+        let AbsRead operation = ReadMemory ((opcode3 <<< 8) ||| opcode2) operation
+        let AbsReadLda () = AbsRead <| SetNZA
+        let AbsReadLdy () = AbsRead <| SetNZY
+        let AbsReadLdx () = AbsRead <| SetNZX
+        let AbsReadBit () = AbsRead <| Bit
+        let AbsReadLax () = AbsRead <| Lax
+        let AbsReadAnd () = AbsRead <| And
+        let AbsReadEor () = AbsRead <| Eor
+        let AbsReadOra () = AbsRead <| Ora
+        let AbsReadAdc () = AbsRead <| Adc
+        let AbsReadCmp () = AbsRead <| Cmp a
+        let AbsReadCpy () = AbsRead <| Cmp y
+        let AbsReadNop () = AbsRead <| ignore
+        let AbsReadCpx () = AbsRead <| Cmp x
+        let AbsReadSbc () = AbsRead <| Sbc
 
         let ZpIdxStage3X () =
             if rdy then
