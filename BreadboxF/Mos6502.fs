@@ -1,7 +1,6 @@
 ﻿namespace Breadbox
 
 type private Uop =
-    | Unsupported
     | Fetch1
     | Fetch1Real
     | Fetch2
@@ -99,14 +98,14 @@ type private Uop =
     | IdxIndRmwStage7Rra
     | IdxIndRmwStage7Isc
     | IdxIndRmwStage7Dcp
-    | IdxIndStage8Rmw
+    | IdxIndRmwStage8
     | AbsIdxStage3X
     | AbsIdxStage3Y
     | AbsIdxStage4
     | AbsIdxWriteStage5Sta
     | AbsIdxWriteStage5Shy
     | AbsIdxWriteStage5Shx
-    | AbsIdxWriteStage5Error
+    | AbsIdxWriteStage5Tas
     | AbsIdxReadStage4
     | AbsIdxReadStage5Lda
     | AbsIdxReadStage5Cmp
@@ -119,7 +118,7 @@ type private Uop =
     | AbsIdxReadStage5Ldy
     | AbsIdxReadStage5Nop
     | AbsIdxReadStage5Lax
-    | AbsIdxReadStage5Error
+    | AbsIdxReadStage5Las
     | AbsIdxRmwStage5
     | AbsIdxRmwStage7
     | AbsIdxRmwStage6Ror
@@ -135,7 +134,6 @@ type private Uop =
     | AbsIdxRmwStage6Dcp
     | AbsIdxRmwStage6Isc
     | IncS
-    | DecS
     | PushPcl
     | PushPch
     | PushP
@@ -201,23 +199,8 @@ type private Uop =
     | RelBranchStage2Bmi
     | RelBranchStage2Bvc
     | RelBranchStage2Bvs
-    | RelBranchStage2
     | RelBranchStage3
     | RelBranchStage4
-    | AluEor
-    | AluBit
-    | AluCpx
-    | AluCpy
-    | AluCmp
-    | AluAdc
-    | AluSbc
-    | AluOra
-    | AluAnd
-    | AluAnc
-    | AluAsr
-    | AluArr
-    | AluLxa
-    | AluAxs
     | AbsIndJmpStage4
     | AbsIndJmpStage5
     | IndIdxStage3
@@ -242,7 +225,7 @@ type private Uop =
     | IndIdxRmwStage7Rra
     | IndIdxRmwStage7Isc
     | IndIdxRmwStage7Dcp
-    | IndIdxStage8Rmw
+    | IndIdxRmwStage8
     | End
     | EndISpecial
     | EndBranchSpecial
@@ -260,7 +243,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.Fetch2; Uop.PushPch; Uop.PushPcl; Uop.PushPBrk; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6Ora; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Slo; Uop.IdxIndStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Slo; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadOra; Uop.End |];
             [| Uop.Fetch2; Uop.ZpRmwStage3; Uop.ZpRmwAsl; Uop.ZpRmwStage5; Uop.End |];
@@ -280,7 +263,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.RelBranchStage2Bpl; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Ora; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Slo; Uop.IndIdxStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Slo; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadOra; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpIdxRmwStage4; Uop.ZpRmwAsl; Uop.ZpIdxRmwStage6; Uop.End |];
@@ -300,7 +283,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.Fetch2; Uop.Nop; Uop.PushPch; Uop.PushPcl; Uop.Jsr; Uop.End |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6And; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Rla; Uop.IdxIndStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Rla; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadBit; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadAnd; Uop.End |];
             [| Uop.Fetch2; Uop.ZpRmwStage3; Uop.ZpRmwRol; Uop.ZpRmwStage5; Uop.End |];
@@ -320,7 +303,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.RelBranchStage2Bmi; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6And; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Rla; Uop.IndIdxStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Rla; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadAnd; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpIdxRmwStage4; Uop.ZpRmwRol; Uop.ZpIdxRmwStage6; Uop.End |];
@@ -340,7 +323,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.FetchDummy; Uop.IncS; Uop.PullP; Uop.PullPcl; Uop.PullPchNoInc; Uop.End |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6Eor; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Sre; Uop.IdxIndStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Sre; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadEor; Uop.End |];
             [| Uop.Fetch2; Uop.ZpRmwStage3; Uop.ZpRmwLsr; Uop.ZpRmwStage5; Uop.End |];
@@ -360,7 +343,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.RelBranchStage2Bvc; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Eor; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Sre; Uop.IndIdxStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Sre; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadEor; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpIdxRmwStage4; Uop.ZpRmwLsr; Uop.ZpIdxRmwStage6; Uop.End |];
@@ -380,7 +363,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.FetchDummy; Uop.IncS; Uop.PullPcl; Uop.PullPchNoInc; Uop.IncPc; Uop.End |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6Adc; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Rra; Uop.IdxIndStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Rra; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadAdc; Uop.End |];
             [| Uop.Fetch2; Uop.ZpRmwStage3; Uop.ZpRmwRor; Uop.ZpRmwStage5; Uop.End |];
@@ -400,7 +383,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.RelBranchStage2Bvs; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Adc; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Rra; Uop.IndIdxStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Rra; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadAdc; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpIdxRmwStage4; Uop.ZpRmwRor; Uop.ZpIdxRmwStage6; Uop.End |];
@@ -450,7 +433,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.ImpTya; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Sta; Uop.End |];
             [| Uop.ImpTxs; Uop.End |];
-            [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Error; Uop.End |];
+            [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Tas; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Shy; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Sta; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Shx; Uop.End |];
@@ -490,7 +473,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.ImpClv; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Lda; Uop.End |];
             [| Uop.ImpTsx; Uop.End |];
-            [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Error; Uop.End |];
+            [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Las; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Ldy; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Lda; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Ldx; Uop.End |];
@@ -500,7 +483,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.ImmCpy; Uop.End |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6Cmp; Uop.End |];
             [| Uop.ImmUnsupported; Uop.End |];
-            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Dcp; Uop.IdxIndStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Dcp; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadCpy; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadCmp; Uop.End |];
             [| Uop.Fetch2; Uop.ZpRmwStage3; Uop.ZpRmwDec; Uop.ZpRmwStage5; Uop.End |];
@@ -520,7 +503,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.RelBranchStage2Bne; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Cmp; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Dcp; Uop.IndIdxStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Dcp; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadCmp; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpIdxRmwStage4; Uop.ZpRmwDec; Uop.ZpIdxRmwStage6; Uop.End |];
@@ -540,7 +523,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.ImmCpx; Uop.End |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6Sbc; Uop.End |];
             [| Uop.ImmUnsupported; Uop.End |];
-            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Isc; Uop.IdxIndStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Isc; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadCpx; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadSbc; Uop.End|];
             [| Uop.Fetch2; Uop.ZpRmwStage3; Uop.ZpRmwInc; Uop.ZpRmwStage5; Uop.End |];
@@ -560,7 +543,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             [| Uop.RelBranchStage2Beq; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Sbc; Uop.End |];
             [| Uop.Jam |];
-            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Isc; Uop.IndIdxStage8Rmw; Uop.End |];
+            [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Isc; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadSbc; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpIdxRmwStage4; Uop.ZpRmwInc; Uop.ZpIdxRmwStage6; Uop.End |];
@@ -610,8 +593,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
     let vopReset = 0x106
     [<Literal>]
     let vopFetch1NoInterrupt = 0x107
-    [<Literal>]
-    let vopNum = 0x108
+
 
     [<Literal>]
     let nmiVector = 0xFFFA
@@ -660,6 +642,15 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             z <- (value &&& 0xFF) = 0
             n <- (value &&& 0x80) <> 0
 
+        let NZA () =
+            NZ a
+
+        let NZX () =
+            NZ x
+
+        let NZY () =
+            NZ y
+
         let ReadMemoryInternal address =
             memory.Read address
 
@@ -674,23 +665,25 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             true
 
         let ReadMemoryPcIncrement operation =
-            ReadMemory pc (fun mem ->
+            ReadMemory pc <| (fun mem ->
                 pc <- pc + 1
                 mem |> operation)
 
         let ReadMemoryS operation =
-            ReadMemory (0x100 ||| s) operation
+            ReadMemory (0x100 ||| s) <| operation
 
         let WriteMemoryS value operation =
-            WriteMemory (0x100 ||| s) value operation
+            WriteMemory (0x100 ||| s) value <| operation
 
         let Push value operation =
-            WriteMemoryS value (fun mem ->
+            WriteMemoryS value <| (fun mem ->
                 mem |> operation
                 s <- (s - 1 &&& 0xFF))
 
+        let PushDiscard value = Push value <| ignore
+
         let Pull operation =
-            ReadMemoryS (fun mem ->
+            ReadMemoryS <| (fun mem ->
                 mem |> operation
                 s <- (s + 1 &&& 0xFF))
 
@@ -738,10 +731,24 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
         let SetNZAlu value =
             SetAlu value
             NZ aluTemp
+        let SetOpcode2 value =
+            opcode2 <- value
+        let SetOpcode3 value =
+            opcode3 <- value
+        let AddOpcode2 value =
+            opcode2 <- (opcode2 + value) &&& 0xFF
+        let AddAluOpcode2 value =
+            aluTemp <- (opcode2 + value) &&& 0xFF
+        let SetLowEa value =
+            ea <- value
+        let SetHighEa value =
+            ea <- ea ||| (value <<< 8)
+        let SetPcJump value =
+            pc <- opcode2 ||| (value <<< 8)
 
         let IfReady action =
             if rdy then
-                action
+                action()
             rdy
 
 
@@ -752,6 +759,10 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             aluTemp <- (register - value) &&& 0xFF
             c <- register >= aluTemp
             NZ aluTemp
+
+        let CmpA value = Cmp a value
+        let CmpX value = Cmp x value
+        let CmpY value = Cmp y value
 
         let And value =
             aluTemp <- a &&& value
@@ -885,7 +896,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
 
         let Dcp value =
             c <- (value &&& 0x01) <> 0
-            (value - 1) &&& 0xFF |> Cmp a
+            (value - 1) &&& 0xFF |> CmpA
 
         let Sre value =
             c <- (value &&& 0x01) <> 0
@@ -910,24 +921,28 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             c <- (aluTemp &&& 0x01) <> 0
             aluTemp <- aluTemp >>> 1
             NZ aluTemp
-            aluTemp
+
+        let LsrA () =
+            Lsr a
+            a <- aluTemp
 
         let Asl value =
             aluTemp <- value
             c <- (aluTemp &&& 0x80) <> 0
             aluTemp <- (aluTemp <<< 1) &&& 0xFF
             NZ aluTemp
-            aluTemp
+
+        let AslA () =
+            Asl a
+            a <- aluTemp
 
         let Inc value =
             aluTemp <- (value + 1) &&& 0xFF
             NZ aluTemp
-            aluTemp
 
         let Dec value =
             aluTemp <- (value - 1) &&& 0xFF
             NZ aluTemp
-            aluTemp
 
         let Lda value =
             a <- value
@@ -951,21 +966,27 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             c <- (aluTemp &&& 0x80) <> 0
             aluTemp <- ((a <<< 1) &&& 0xFF) ||| (if oldC then 0x01 else 0x00)
             NZ aluTemp
-            aluTemp
+
+        let RolA () =
+            Rol a
+            a <- aluTemp
 
         let Ror value =
             let oldC = c
             c <- (aluTemp &&& 0x01) <> 0
             aluTemp <- (a >>> 1) ||| (if oldC then 0x80 else 0x00)
             NZ aluTemp
-            aluTemp
+
+        let RorA () =
+            Ror a
+            a <- aluTemp
 
 
         // ----- uOPS -----
 
 
-        let FetchDummy operation =
-            ReadMemory pc (fun mem -> operation)
+        let FetchDiscard address operation = ReadMemory address (fun _ -> operation())
+        let FetchDummy = FetchDiscard pc
 
         let Fetch1RealInternal () =
             opcode <- ReadMemoryInternal pc
@@ -974,10 +995,10 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             pc <- (pc + 1) &&& 0xFFFF
 
         let Fetch1Real () =
-            IfReady <| Fetch1RealInternal()
+            IfReady <| Fetch1RealInternal
 
         let Fetch1 () =
-            IfReady <| (
+            IfReady <| (fun _ ->
                 myIFlag <- i
                 i <- iFlagPending
                 if not branchIrqHack then
@@ -995,26 +1016,18 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
                             mi <- 0
                             ExecuteOneRetry()
                 else
-                    Fetch1Real() |> ignore
-            )
+                    Fetch1RealInternal())
 
-        let Fetch2 () =
-            ReadMemoryPcIncrement <| fun value -> opcode2 <- value
-
-        let Fetch3 () =
-            ReadMemoryPcIncrement <| fun value -> opcode3 <- value
-
-        let PushPch () =
-            Push (GetPch()) ignore
-
-        let PushPcl () =
-            Push (GetPcl()) ignore
+        let Fetch2 () = ReadMemoryPcIncrement <| SetOpcode2
+        let Fetch3 () = ReadMemoryPcIncrement <| SetOpcode3
+        let PushPch () = Push (GetPch()) <| ignore
+        let PushPcl () = Push (GetPcl()) <| ignore
 
         let PushPInterrupt newB newEa =
             b <- newB
-            Push (GetP()) <| (fun value ->
+            Push (GetP()) <| fun _ ->
                 i <- true
-                ea <- newEa)
+                ea <- newEa
 
         let PushPBrk () =
             PushPInterrupt true brkVector
@@ -1029,133 +1042,84 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
             PushPInterrupt false resetVector
 
         let PushDummy () =
-            IfReady <| s <- (s - 1) &&& 0xFF
+            IfReady <| fun _ -> s <- (s - 1) &&& 0xFF
 
         let FetchPclVector () =
-            IfReady <| (
+            IfReady <| fun _ ->
                 if nmi && ((ea = brkVector && b) || (ea = irqVector && (not b))) then
                     nmi <- false
                     ea <- nmiVector
-                aluTemp <- ReadMemoryInternal ea)
+                aluTemp <- ReadMemoryInternal ea
             
         let FetchPchVector () =
-            IfReady <| (
+            IfReady <| fun _ ->
                 aluTemp <- aluTemp ||| (ReadMemoryInternal(ea) <<< 8)
-                pc <- aluTemp)
+                pc <- aluTemp
 
-        let ImpIny () =
-            FetchDummy <| (
-                y <- y + 1
-                NZ y)
+        let Imp = FetchDummy
+        let ImpIny () = Imp <| fun _ -> (Inc y; y <- aluTemp)
+        let ImpDey () = Imp <| fun _ -> (Dec y; y <- aluTemp)
+        let ImpInx () = Imp <| fun _ -> (Inc x; x <- aluTemp)
+        let ImpDex () = Imp <| fun _ -> (Dec x; x <- aluTemp)
+        let ImpTsx () = Imp <| fun _ -> SetNZX s
+        let ImpTxs () = Imp <| fun _ -> s <- x
+        let ImpTax () = Imp <| fun _ -> SetNZX a
+        let ImpTay () = Imp <| fun _ -> SetNZY a
+        let ImpTya () = Imp <| fun _ -> SetNZA y
+        let ImpTxa () = Imp <| fun _ -> SetNZA x
+        let ImpSei () = Imp <| fun _ -> iFlagPending <- true
+        let ImpCli () = Imp <| fun _ -> iFlagPending <- false
+        let ImpSec () = Imp <| fun _ -> c <- true
+        let ImpClc () = Imp <| fun _ -> c <- false
+        let ImpClv () = Imp <| fun _ -> v <- false
+        let ImpSed () = Imp <| fun _ -> (d <- true; isDecimalMode <- config.HasDecimalMode)
+        let ImpCld () = Imp <| fun _ -> (d <- false; isDecimalMode <- false)
 
-        let ImpDey () =
-            FetchDummy <| (
-                y <- y - 1
-                NZ y)
-            
-        let ImpInx () =
-            FetchDummy <| (
-                x <- x + 1
-                NZ x)
+        let AbsWrite value = WriteMemory ((opcode3 <<< 8) ||| opcode2) value <| ignore
+        let AbsWriteSta () = AbsWrite <| a
+        let AbsWriteStx () = AbsWrite <| x
+        let AbsWriteSty () = AbsWrite <| y
+        let AbsWriteSax () = AbsWrite <| (x &&& a)
 
-        let ImpDex () =
-            FetchDummy <| (
-                x <- x - 1
-                NZ x)
+        let ZpWrite value = WriteMemory opcode2 value <| ignore
+        let ZpWriteSta () = ZpWrite <| a
+        let ZpWriteStx () = ZpWrite <| x
+        let ZpWriteSty () = ZpWrite <| y
+        let ZpWriteSax () = ZpWrite <| (x &&& a)
 
-        let ImpTsx () =
-            FetchDummy <| (
-                x <- s
-                NZ x)
-
-        let ImpTxs () =
-            FetchDummy <| (
-                s <- x)
-
-        let ImpTax () =
-            FetchDummy <| (
-                x <- a
-                NZ x)
-
-        let ImpTay () =
-            FetchDummy <| (
-                y <- a
-                NZ x)
-            
-        let ImpTya () =
-            FetchDummy <| (
-                a <- y
-                NZ a)
-        
-        let ImpTxa () =
-            FetchDummy <| (
-                a <- x
-                NZ a)
-
-        let ImpSei () = FetchDummy <| iFlagPending <- true
-        let ImpCli () = FetchDummy <| iFlagPending <- false
-        let ImpSec () = FetchDummy <| c <- true
-        let ImpClc () = FetchDummy <| c <- false
-        let ImpClv () = FetchDummy <| v <- false
-
-        let ImpSed () =
-            FetchDummy <| (
-                d <- true
-                isDecimalMode <- config.HasDecimalMode)
-
-        let ImpCld () =
-            FetchDummy <| (
-                d <- false
-                isDecimalMode <- false)
-
-        let AbsWrite value = WriteMemory ((opcode3 <<< 8) ||| opcode2) value
-        let AbsWriteSta () = AbsWrite a
-        let AbsWriteStx () = AbsWrite x
-        let AbsWriteSty () = AbsWrite y
-        let AbsWriteSax () = AbsWrite (x &&& a)
-
-        let ZpWrite value = WriteMemory opcode2 value
-        let ZpWriteSta () = ZpWrite a
-        let ZpWriteStx () = ZpWrite x
-        let ZpWriteSty () = ZpWrite y
-        let ZpWriteSax () = ZpWrite (x &&& a)
-
-        let IndIdxStage3 () =
-            ReadMemory opcode2 (fun mem ->
-                ea <- mem)
-
+        let IndIdxStage3 () = ReadMemory opcode2 SetLowEa
         let IndIdxStage4 () =
-            IfReady <| (
+            IfReady <| fun _ ->
                 aluTemp <- ea + y
-                ea <- (((opcode2 + 1) &&& 0xFF) <<< 8) ||| (aluTemp &&& 0xFF) |> ReadMemoryInternal)
+                ea <- ReadMemoryInternal <| (((opcode2 + 1) &&& 0xFF) <<< 8) ||| (aluTemp &&& 0xFF)
 
         let IndIdxWriteStage5 () =
-            IfReady <| (
+            IfReady <| fun _ ->
                 ReadMemoryInternal ea |> ignore
-                ea <- ea + (aluTemp &&& 0xFF00))
+                ea <- ea + (aluTemp &&& 0xFF00)
 
         let IndIdxReadStage5 () =
-            IfReady <| (
+            IfReady <| fun _ ->
                 if aluTemp >= 0x100 then
                     mi <- mi + 1
                     ExecuteOneRetry()
                 else
                     ReadMemoryInternal ea |> ignore
-                    ea <- (ea + 0x100) &&& 0xFFFF)
+                    ea <- (ea + 0x100) &&& 0xFFFF
 
         let IndIdxRmwStage5 () =
-            IfReady <| (
+            IfReady <| fun _ ->
                 if aluTemp >= 0x100 then
                     ea <- (ea + 0x100) &&& 0xFFFF
-                ReadMemoryInternal ea |> ignore)
+                ReadMemoryInternal ea |> ignore
 
-        let IndIdxWriteStage6 value = WriteMemory ea value ignore
-        let IndIdxWriteStage6Sta () = IndIdxWriteStage6 a
-        let IndIdxWriteStage6Sha () = IndIdxWriteStage6 (a &&& x &&& 7)
+        let IndIdxWriteStage6 value = WriteMemory ea value <| ignore
+        let IndIdxWriteStage6Sta () = IndIdxWriteStage6 <| a
+        let IndIdxWriteStage6Sha () = IndIdxWriteStage6 <| (a &&& x &&& 7)
 
-        let IndIdxReadStage6 operation = ReadMemory ea operation
+        let IndIdxReadStage6 operation = ReadMemory ea <| operation
         let IndIdxReadStage6Lda () = IndIdxReadStage6 <| Lda
-        let IndIdxReadStage6Cmp () = IndIdxReadStage6 <| Cmp a
+        let IndIdxReadStage6Cmp () = IndIdxReadStage6 <| CmpA
         let IndIdxReadStage6And () = IndIdxReadStage6 <| And
         let IndIdxReadStage6Eor () = IndIdxReadStage6 <| Eor
         let IndIdxReadStage6Lax () = IndIdxReadStage6 <| Lax
@@ -1163,9 +1127,9 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
         let IndIdxReadStage6Sbc () = IndIdxReadStage6 <| Sbc
         let IndIdxReadStage6Ora () = IndIdxReadStage6 <| Ora
 
-        let IndIdxRmwStage6 () = ReadMemory ea (fun mem -> aluTemp <- mem)
+        let IndIdxRmwStage6 () = ReadMemory ea <| SetAlu
 
-        let IndIdxRmwStage7 operation = WriteMemory ea aluTemp operation
+        let IndIdxRmwStage7 operation = WriteMemory ea aluTemp <| operation
         let IndIdxRmwStage7Slo () = IndIdxRmwStage7 <| Slo
         let IndIdxRmwStage7Sre () = IndIdxRmwStage7 <| Sre
         let IndIdxRmwStage7Rra () = IndIdxRmwStage7 <| Rra
@@ -1173,7 +1137,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
         let IndIdxRmwStage7Dcp () = IndIdxRmwStage7 <| Dcp
         let IndIdxRmwStage7Rla () = IndIdxRmwStage7 <| Rla
 
-        let IndIdxRmwStage8 () = WriteMemory ea aluTemp ignore
+        let IndIdxRmwStage8 () = WriteMemory ea aluTemp <| ignore
 
         let RelBranchStage2 branchTaken =
             ReadMemoryPcIncrement (fun mem ->
@@ -1192,7 +1156,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
         let RelBranchStage2Bne () = RelBranchStage2 (not z)
 
         let RelBranchStage3 () =
-            FetchDummy <| (
+            FetchDummy <| fun _ ->
                 aluTemp <- (pc &&& 0xFF) + opcode2
                 pc <- (pc &&& 0xFF00) ||| (aluTemp &&& 0xFF)
                 if aluTemp >= 0x100 then
@@ -1200,30 +1164,20 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
                     mi <- -1
                 else
                     if interruptPending then
-                        branchIrqHack <- true)
+                        branchIrqHack <- true
 
         let RelBranchStage4 () =
-            FetchDummy <| (
-                pc <- (pc + (if aluTemp < 0 then -256 else 256)) &&& 0xFFFF)
+            FetchDummy <| fun _ ->
+                pc <- (pc + (if aluTemp < 0 then -256 else 256)) &&& 0xFFFF
 
-        let Nop () = FetchDummy
-        let DecS () = FetchDummy <| s <- (s - 1) &&& 0xFF
-        let IncS () = FetchDummy <| s <- (s + 1) &&& 0xFF
-
-        let Jsr () =
-            ReadMemory pc (fun mem ->
-                pc <- (mem <<< 8) ||| opcode2)
-
-        let PullP () = ReadMemoryS SetP
-
-        let PullPcl () =
-            ReadMemoryS (fun mem -> 
-                pc <- (pc &&& 0xFF00) ||| mem)
-
+        let IncS () = FetchDummy <| fun _ -> s <- (s + 1) &&& 0xFF
+        let Jsr () = ReadMemory pc <| SetPcJump
+        let PullP () = Pull <| SetP
+        let PullPcl () = Pull <| SetPcl
         let PullPchNoInc () =
-            IfReady <| pc <- (pc &&& 0x00FF) ||| (ReadMemoryInternal(0x0100 ||| s) <<< 8)
+            IfReady <| fun _ -> pc <- (pc &&& 0x00FF) ||| (ReadMemoryInternal(0x0100 ||| s) <<< 8)
 
-        let AbsRead operation = ReadMemory ((opcode3 <<< 8) ||| opcode2) operation
+        let AbsRead operation = ReadMemory ((opcode3 <<< 8) ||| opcode2) <| operation
         let AbsReadLda () = AbsRead <| SetNZA
         let AbsReadLdy () = AbsRead <| SetNZY
         let AbsReadLdx () = AbsRead <| SetNZX
@@ -1233,298 +1187,111 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
         let AbsReadEor () = AbsRead <| Eor
         let AbsReadOra () = AbsRead <| Ora
         let AbsReadAdc () = AbsRead <| Adc
-        let AbsReadCmp () = AbsRead <| Cmp a
-        let AbsReadCpy () = AbsRead <| Cmp y
+        let AbsReadCmp () = AbsRead <| CmpA
+        let AbsReadCpy () = AbsRead <| CmpY
         let AbsReadNop () = AbsRead <| ignore
-        let AbsReadCpx () = AbsRead <| Cmp x
+        let AbsReadCpx () = AbsRead <| CmpX
         let AbsReadSbc () = AbsRead <| Sbc
 
-        let ZpIdxStage3X () =
-            if rdy then
-                ReadMemory opcode2 |> ignore
-                opcode2 <- (opcode2 + x) &&& 0xFF
-            rdy
+        let ZpIdxStage3 value = ReadMemory opcode2 <| AddOpcode2         
+        let ZpIdxStage3X () = ZpIdxStage3 <| x
+        let ZpIdxStage3Y () = ZpIdxStage3 <| y
 
-        let ZpIdxStage3Y () =
-            IfReady <| (
-                ReadMemory opcode2 |> ignore
-                opcode2 <- (opcode2 + y) &&& 0xFF)
+        let ZpIdxRmwStage4 () = ReadMemory opcode2 <| SetAlu
+        let ZpIdxRmwStage6 () = WriteMemory opcode2 aluTemp <| ignore
 
-        let ZpIdxRmwStage4 () =
-            IfReady <| (aluTemp <- ReadMemory opcode2)
+        let ZpRead operation = ReadMemory opcode2 <| operation
+        let ZpReadEor () = ZpRead <| Eor
+        let ZpReadBit () = ZpRead <| Bit
+        let ZpReadLda () = ZpRead <| Lda
+        let ZpReadLdy () = ZpRead <| Ldy
+        let ZpReadLdx () = ZpRead <| Ldx
+        let ZpReadLax () = ZpRead <| Lax
+        let ZpReadCpy () = ZpRead <| CmpY
+        let ZpReadCmp () = ZpRead <| CmpA
+        let ZpReadCpx () = ZpRead <| CmpX
+        let ZpReadOra () = ZpRead <| Ora
+        let ZpReadNop () = ZpRead <| ignore
+        let ZpReadSbc () = ZpRead <| Sbc
+        let ZpReadAdc () = ZpRead <| Adc
+        let ZpReadAnd () = ZpRead <| And
 
-        let ZpIdxRmwStage6 () =
-            aluTemp |> WriteMemory opcode2 |> ignore
-            true
+        let Imm operation = ReadMemoryPcIncrement <| operation
+        let ImmEor () = Imm <| Eor
+        let ImmAnc () = Imm <| Anc
+        let ImmAsr () = Imm <| Asr
+        let ImmAxs () = Imm <| Axs
+        let ImmArr () = Imm <| Arr
+        let ImmLxa () = Imm <| Lxa
+        let ImmOra () = Imm <| Ora
+        let ImmCpy () = Imm <| CmpY
+        let ImmCpx () = Imm <| CmpX
+        let ImmCmp () = Imm <| CmpA
+        let ImmSbc () = Imm <| Sbc
+        let ImmAnd () = Imm <| And
+        let ImmAdc () = Imm <| Adc
+        let ImmLda () = Imm <| Lda
+        let ImmLdx () = Imm <| Ldx
+        let ImmLdy () = Imm <| Ldy
+        let ImmUnsupported () = Imm <| ignore
 
-        let ZpReadEor () =
-            if rdy then
-                ReadMemory opcode2 |> Eor
-            rdy
+        let IdxIndStage3 () = ReadMemory opcode2 <| AddAluOpcode2
+        let IdxIndStage4 () = ReadMemory aluTemp <| SetLowEa
+        let IdxIndStage5 () = ReadMemory (aluTemp + 1) <| SetHighEa
 
-        let ZpReadBit () =
-            if rdy then
-                ReadMemory opcode2 |> Bit
-            rdy
-
-        let ZpReadLda () =
-            if rdy then
-                ReadMemory opcode2 |> Lda
-            rdy
-
-        let ZpReadLdy () =
-            if rdy then
-                ReadMemory opcode2 |> Ldy
-            rdy
-
-        let ZpReadLdx () =
-            if rdy then
-                ReadMemory opcode2 |> Ldx
-            rdy
-
-        let ZpReadLax () =
-            if rdy then
-                ReadMemory opcode2 |> Lax
-            rdy
-
-        let ZpReadCpy () =
-            if rdy then
-                ReadMemory opcode2 |> Cmp y
-            rdy
-
-        let ZpReadCmp () =
-            if rdy then
-                ReadMemory opcode2 |> Cmp a
-            rdy
-
-        let ZpReadCpx () =
-            if rdy then
-                ReadMemory opcode2 |> Cmp x
-            rdy
-
-        let ZpReadOra () =
-            if rdy then
-                ReadMemory opcode2 |> Ora
-            rdy
-
-        let ZpReadNop () =
-            if rdy then
-                ReadMemory opcode2 |> ignore
-            rdy
-
-        let ZpReadSbc () =
-            if rdy then
-                ReadMemory opcode2 |> Sbc
-            rdy
-
-        let ZpReadAdc () =
-            if rdy then
-                ReadMemory opcode2 |> Adc
-            rdy
-
-        let ZpReadAnd () =
-            if rdy then
-                ReadMemory opcode2 |> And
-            rdy
-
-        let ImmEor () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Eor
-            rdy
-
-        let ImmAnc () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Anc
-            rdy
-
-        let ImmAsr () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Asr
-            rdy
-
-        let ImmAxs () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Axs
-            rdy
-
-        let ImmArr () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Arr
-            rdy
-
-        let ImmLxa () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Lxa
-            rdy
-
-        let ImmOra () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Ora
-            rdy
-
-        let ImmCpy () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Cmp y
-            rdy
-
-        let ImmCpx () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Cmp x
-            rdy
-
-        let ImmCmp () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Cmp a
-            rdy
-
-        let ImmSbc () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Sbc
-            rdy
-
-        let ImmAnd () =
-            if rdy then
-                ReadMemoryPcIncrement() |> And
-            rdy
-
-        let ImmAdc () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Adc
-            rdy
-
-        let ImmLda () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Lda
-            rdy
-
-        let ImmLdx () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Ldx
-            rdy
-
-        let ImmLdy () =
-            if rdy then
-                ReadMemoryPcIncrement() |> Ldy
-            rdy
-
-        let ImmUnsupported () =
-            if rdy then
-                ReadMemoryPcIncrement |> ignore
-            rdy
-
-        let IdxIndStage3 () =
-            if rdy then
-                ReadMemory opcode2 |> ignore
-                aluTemp <- (opcode2 + x) &&& 0xFF
-            rdy
-
-        let IdxIndStage4 () =
-            if rdy then
-                ea <- ReadMemory aluTemp
-            rdy
-
-        let IdxIndStage5 () =
-            if rdy then
-                ea <- ea ||| (ReadMemory(aluTemp + 1) <<< 8)
-            rdy
-
-        let IdxIndReadStage6 operation =
-            IfReady <| (ReadMemory ea |> operation)
-
+        let IdxIndReadStage6 = ReadMemory ea
         let IdxIndReadStage6Lda () = IdxIndReadStage6 <| Lda
         let IdxIndReadStage6Ora () = IdxIndReadStage6 <| Ora
         let IdxIndReadStage6Lax () = IdxIndReadStage6 <| Lax
-        let IdxIndReadStage6Cmp () = IdxIndReadStage6 <| Cmp a
+        let IdxIndReadStage6Cmp () = IdxIndReadStage6 <| CmpA
         let IdxIndReadStage6Adc () = IdxIndReadStage6 <| Adc
         let IdxIndReadStage6And () = IdxIndReadStage6 <| And
         let IdxIndReadStage6Eor () = IdxIndReadStage6 <| Eor
         let IdxIndReadStage6Sbc () = IdxIndReadStage6 <| Sbc
 
-        let IdxIndWriteStage6 value =
-            value |> WriteMemory ea |> ignore
-            true
-
+        let IdxIndWriteStage6 value = WriteMemory ea value <| ignore
         let IdxIndWriteStage6Sta () = IdxIndWriteStage6 <| a
         let IdxIndWriteStage6Sax () = IdxIndWriteStage6 <| (a &&& x)
 
-        let IdxIndRmwStage6 () =
-            IfReady <| aluTemp <- ReadMemory ea
+        let IdxIndRmwStage6 () = ReadMemory ea <| SetAlu
 
-        let IdxIndRmwStage7 operation =
-            aluTemp |> WriteMemory ea |> operation |> ignore
-            true
-
+        let IdxIndRmwStage7 = WriteMemory ea aluTemp
         let IdxIndRmwStage7Slo () = IdxIndRmwStage7 <| Slo
         let IdxIndRmwStage7Sre () = IdxIndRmwStage7 <| Sre
         let IdxIndRmwStage7Rra () = IdxIndRmwStage7 <| Rra
         let IdxIndRmwStage7Isc () = IdxIndRmwStage7 <| Isc
+        let IdxIndRmwStage7Dcp () = IdxIndRmwStage7 <| Dcp
+        let IdxIndRmwStage7Rla () = IdxIndRmwStage7 <| Rla
 
-        let IdxIndRmwStage8 () =
-            aluTemp |> WriteMemory ea |> ignore
-            true
+        let IdxIndRmwStage8 () = WriteMemory ea aluTemp <| ignore
 
         let PushP () =
             b <- true
-            GetP() |> Push
-            true
+            PushDiscard <| GetP()
 
-        let PushA () =
-            Push a
-            true
+        let PushA () = PushDiscard a
 
         let PullPNoInc () =
-            if rdy then
+            ReadMemoryS <| fun mem ->
                 myIFlag <- i
-                ReadMemoryS() |> SetP
+                SetP mem
                 iFlagPending <- i
                 i <- myIFlag
-            rdy
 
-        let ImpAslA () =
-            if rdy then
-                FetchDummy()
-                a <- Asl a
-            rdy
+        let PullANoInc () = ReadMemoryS <| SetA
 
-        let ImpRolA () =
-            if rdy then
-                FetchDummy()
-                a <- Rol a
-            rdy
+        let Imp operation = FetchDummy <| operation
+        let ImpAslA () = Imp <| AslA
+        let ImpRolA () = Imp <| RolA
+        let ImpRorA () = Imp <| RorA
+        let ImpLsrA () = Imp <| LsrA
 
-        let ImpRorA () =
-            if rdy then
-                FetchDummy()
-                a <- Ror a
-            rdy
+        let JmpAbs () = ReadMemory pc <| SetPcJump
+        let IncPc () = FetchDummy <| fun _ -> pc <- (pc + 1) &&& 0xFFFF
 
-        let ImpLsrA () =
-            if rdy then
-                FetchDummy()
-                a <- Lsr a
-            rdy
-
-        let JmpAbs () =
-            if rdy then
-                pc <- ((ReadMemory pc) <<< 8) ||| opcode2
-            rdy
-            
-        let IncPc () =
-            if rdy then
-                FetchDummy()
-                pc <- pc + 1
-            rdy
-
-        let ZpRmwStage3 () =
-            IfReady <| aluTemp <- ReadMemory opcode2
-
-        let ZpRmwStage5 () =
-            aluTemp |> WriteMemory opcode2 |> ignore
-            true
-
-        let ZpRmw operation =
-            aluTemp |> WriteMemory opcode2 |> operation |> ignore
-            true
+        let ZpRmwStage3 () = ReadMemory opcode2 <| SetAlu
+        let ZpRmwStage5 () = WriteMemory opcode2 aluTemp <| ignore
+        let ZpRmw operation = WriteMemory opcode2 aluTemp <| operation
 
         let ZpRmwInc () = ZpRmw Inc
         let ZpRmwDec () = ZpRmw Dec
@@ -1538,27 +1305,373 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
         let ZpRmwSlo () = ZpRmw Slo
         let ZpRmwIsc () = ZpRmw Isc
         let ZpRmwRla () = ZpRmw Rla
-            
 
-            
+        let AbsIdxStage3 value =
+            ReadMemoryPcIncrement <| (fun mem ->
+                opcode3 <- mem
+                aluTemp <- opcode2 + value
+                ea <- (opcode3 <<< 8) + (aluTemp &&& 0xFF))
 
+        let AbsIdxStage3X () = AbsIdxStage3 x
+        let AbsIdxStage3Y () = AbsIdxStage3 y
 
-            
-
+        let AbsIdxReadStage4 () =
+            IfReady <| (fun _ ->
+                if (aluTemp &&& 0x100) = 0 then
+                    mi <- mi + 1
+                    ExecuteOneRetry()
+                else
+                    aluTemp <- ReadMemoryInternal ea
+                    ea <- (ea + 0x100) &&& 0xFFFF)
         
+        let AbsIdxStage4 () =
+            ReadMemory ea <| fun mem ->
+                if (aluTemp &&& 0x100) <> 0 then
+                    ea <- ea + 0x100
+                aluTemp <- mem
+
+        let AbsIdxWriteStage5 value =
+            WriteMemory ea value <| ignore
+
+        let AbsIdxWriteStage5Sh register =
+            aluTemp <- register &&& (ea >>> 8)
+            ea <- (ea &&& 0xFF) ||| (aluTemp <<< 8)
+            AbsIdxWriteStage5 aluTemp
+
+        let AbsIdxWriteStage5Sta () = AbsIdxWriteStage5 a
+        let AbsIdxWriteStage5Shy () = AbsIdxWriteStage5Sh y
+        let AbsIdxWriteStage5Shx () = AbsIdxWriteStage5Sh x
+
+        let AbsIdxWriteStage5Tas () =
+            s <- a &&& x
+            AbsIdxWriteStage5 (s &&& (ea >>> 8))
+
+        let AbsIdxRmwStage5 () = ReadMemory ea <| SetAlu
+        let AbsIdxRmwStage7 () = WriteMemory ea aluTemp <| ignore
+
+        let AbsIdxRmwStage6 = WriteMemory ea aluTemp
+        let AbsIdxRmwStage6Dec () = AbsIdxRmwStage6 <| Dec
+        let AbsIdxRmwStage6Dcp () = AbsIdxRmwStage6 <| Dcp
+        let AbsIdxRmwStage6Isc () = AbsIdxRmwStage6 <| Isc
+        let AbsIdxRmwStage6Inc () = AbsIdxRmwStage6 <| Inc
+        let AbsIdxRmwStage6Rol () = AbsIdxRmwStage6 <| Rol
+        let AbsIdxRmwStage6Lsr () = AbsIdxRmwStage6 <| Lsr
+        let AbsIdxRmwStage6Slo () = AbsIdxRmwStage6 <| Slo
+        let AbsIdxRmwStage6Sre () = AbsIdxRmwStage6 <| Sre
+        let AbsIdxRmwStage6Rra () = AbsIdxRmwStage6 <| Rra
+        let AbsIdxRmwStage6Rla () = AbsIdxRmwStage6 <| Rla
+        let AbsIdxRmwStage6Asl () = AbsIdxRmwStage6 <| Asl
+        let AbsIdxRmwStage6Ror () = AbsIdxRmwStage6 <| Ror
+
+        let AbsIdxReadStage5 = ReadMemory ea
+        let AbsIdxReadStage5Lda () = AbsIdxReadStage5 <| Lda
+        let AbsIdxReadStage5Ldx () = AbsIdxReadStage5 <| Ldx
+        let AbsIdxReadStage5Lax () = AbsIdxReadStage5 <| Lax
+        let AbsIdxReadStage5Ldy () = AbsIdxReadStage5 <| Ldy
+        let AbsIdxReadStage5Ora () = AbsIdxReadStage5 <| Ora
+        let AbsIdxReadStage5Nop () = AbsIdxReadStage5 <| ignore
+        let AbsIdxReadStage5Cmp () = AbsIdxReadStage5 <| CmpA
+        let AbsIdxReadStage5Sbc () = AbsIdxReadStage5 <| Sbc
+        let AbsIdxReadStage5Adc () = AbsIdxReadStage5 <| Adc
+        let AbsIdxReadStage5Eor () = AbsIdxReadStage5 <| Eor
+        let AbsIdxReadStage5And () = AbsIdxReadStage5 <| And
+        let AbsIdxReadStage5Las () = AbsIdxReadStage5 <| fun mem ->
+            s <- mem &&& s
+            x <- s
+            a <- s
+            NZ a
+
+        let AbsIndJmpStage4 () =
+            IfReady <| fun _ ->
+                ea <- (opcode3 <<< 8) + opcode2
+                aluTemp <- ReadMemoryInternal ea
+
+        let AbsIndJmpStage5 () =
+            IfReady <| fun _ ->
+                ea <- (opcode3 <<< 8) + ((opcode2 + 1) &&& 0xFF)
+                pc <- aluTemp ||| (ReadMemoryInternal(ea) <<< 8)
+
+        let AbsRmwStage4 () =
+            IfReady <| fun _ ->
+                ea <- (opcode3 <<< 8) + opcode2
+                aluTemp <- ReadMemoryInternal ea
+
+        let AbsRmwStage5 = WriteMemory ea aluTemp
+        let AbsRmwStage5Inc () = AbsRmwStage5 <| Inc
+        let AbsRmwStage5Dec () = AbsRmwStage5 <| Dec
+        let AbsRmwStage5Dcp () = AbsRmwStage5 <| Dcp
+        let AbsRmwStage5Isc () = AbsRmwStage5 <| Isc
+        let AbsRmwStage5Asl () = AbsRmwStage5 <| Asl
+        let AbsRmwStage5Ror () = AbsRmwStage5 <| Ror
+        let AbsRmwStage5Slo () = AbsRmwStage5 <| Slo
+        let AbsRmwStage5Rla () = AbsRmwStage5 <| Rla
+        let AbsRmwStage5Sre () = AbsRmwStage5 <| Sre
+        let AbsRmwStage5Rra () = AbsRmwStage5 <| Rra
+        let AbsRmwStage5Rol () = AbsRmwStage5 <| Rol
+        let AbsRmwStage5Lsr () = AbsRmwStage5 <| Lsr
+
+        let AbsRmwStage6 () = WriteMemory ea aluTemp <| ignore
+
+        let EndISpecial () =
+            opcode <- vopFetch1
+            mi <- 0
+            ExecuteOneRetry()
+            rdy
+
+        let EndSuppressInterrupt () =
+            opcode <- vopFetch1NoInterrupt
+            mi <- 0
+            ExecuteOneRetry()
+            rdy
+
+        let End () =
+            opcode <- vopFetch1
+            mi <- 0
+            iFlagPending <- i
+            ExecuteOneRetry()
+            rdy
+
+        let EndBranchSpecial = End
+
+        let Jam () = true
 
 
+        // ----- Execution -----
 
 
-            
+        let executed = 
+            match microCode.[opcode].[mi] with
+                | Uop.Fetch1 -> Fetch1
+                | Uop.Fetch1Real -> Fetch1Real
+                | Uop.Fetch2 -> Fetch2
+                | Uop.Fetch3 -> Fetch3
+                | Uop.FetchDummy -> fun _ -> FetchDummy <| ignore
+                | Uop.PushPch -> PushPch
+                | Uop.PushPcl -> PushPcl
+                | Uop.PushPBrk -> PushPBrk
+                | Uop.PushPIrq -> PushPIrq
+                | Uop.PushPNmi -> PushPNmi
+                | Uop.PushPReset -> PushPReset
+                | Uop.PushDummy -> PushDummy
+                | Uop.FetchPclVector -> FetchPclVector
+                | Uop.FetchPchVector -> FetchPchVector
+                | Uop.ImpIny -> ImpIny
+                | Uop.ImpDey -> ImpDey
+                | Uop.ImpInx -> ImpInx
+                | Uop.ImpDex -> ImpDex
+                | Uop.NzA -> fun _ -> FetchDummy <| NZA
+                | Uop.NzX -> fun _ -> FetchDummy <| NZX
+                | Uop.NzY -> fun _ -> FetchDummy <| NZY
+                | Uop.ImpTsx -> ImpTsx
+                | Uop.ImpTxs -> ImpTsx
+                | Uop.ImpTax -> ImpTax
+                | Uop.ImpTay -> ImpTay
+                | Uop.ImpTya -> ImpTya
+                | Uop.ImpTxa -> ImpTxa
+                | Uop.ImpSei -> ImpSei
+                | Uop.ImpCli -> ImpCli
+                | Uop.ImpSec -> ImpSec
+                | Uop.ImpClc -> ImpClc
+                | Uop.ImpSed -> ImpSed
+                | Uop.ImpCld -> ImpCld
+                | Uop.ImpClv -> ImpClv
+                | Uop.AbsWriteSta -> AbsWriteSta
+                | Uop.AbsWriteStx -> AbsWriteStx
+                | Uop.AbsWriteSty -> AbsWriteSty
+                | Uop.AbsWriteSax -> AbsWriteSax
+                | Uop.ZpWriteSta -> ZpWriteSta
+                | Uop.ZpWriteSty -> ZpWriteSty
+                | Uop.ZpWriteStx -> ZpWriteStx
+                | Uop.ZpWriteSax -> ZpWriteSax
+                | Uop.IndIdxStage3 -> IndIdxStage3
+                | Uop.IndIdxStage4 -> IndIdxStage4
+                | Uop.IndIdxWriteStage5 -> IndIdxWriteStage5
+                | Uop.IndIdxReadStage5 -> IndIdxReadStage5
+                | Uop.IndIdxRmwStage5 -> IndIdxRmwStage5
+                | Uop.IndIdxWriteStage6Sta -> IndIdxWriteStage6Sta
+                | Uop.IndIdxWriteStage6Sha -> IndIdxWriteStage6Sha
+                | Uop.IndIdxReadStage6Lda -> IndIdxReadStage6Lda
+                | Uop.IndIdxReadStage6Cmp -> IndIdxReadStage6Cmp
+                | Uop.IndIdxReadStage6And -> IndIdxReadStage6And
+                | Uop.IndIdxReadStage6Eor -> IndIdxReadStage6Eor
+                | Uop.IndIdxReadStage6Lax -> IndIdxReadStage6Lax
+                | Uop.IndIdxReadStage6Adc -> IndIdxReadStage6Adc
+                | Uop.IndIdxReadStage6Sbc -> IndIdxReadStage6Sbc
+                | Uop.IndIdxReadStage6Ora -> IndIdxReadStage6Ora
+                | Uop.IndIdxRmwStage6 -> IndIdxRmwStage6
+                | Uop.IndIdxRmwStage7Slo -> IndIdxRmwStage7Slo
+                | Uop.IndIdxRmwStage7Sre -> IndIdxRmwStage7Sre
+                | Uop.IndIdxRmwStage7Rra -> IndIdxRmwStage7Rra
+                | Uop.IndIdxRmwStage7Isc -> IndIdxRmwStage7Isc
+                | Uop.IndIdxRmwStage7Dcp -> IndIdxRmwStage7Dcp
+                | Uop.IndIdxRmwStage7Rla -> IndIdxRmwStage7Rla
+                | Uop.IndIdxRmwStage8 -> IndIdxRmwStage8
+                | Uop.RelBranchStage2Bvs -> RelBranchStage2Bvs
+                | Uop.RelBranchStage2Bvc -> RelBranchStage2Bvc
+                | Uop.RelBranchStage2Bmi -> RelBranchStage2Bmi
+                | Uop.RelBranchStage2Bpl -> RelBranchStage2Bpl
+                | Uop.RelBranchStage2Bcs -> RelBranchStage2Bcs
+                | Uop.RelBranchStage2Bcc -> RelBranchStage2Bcc
+                | Uop.RelBranchStage2Beq -> RelBranchStage2Beq
+                | Uop.RelBranchStage2Bne -> RelBranchStage2Bne
+                | Uop.RelBranchStage3 -> RelBranchStage3
+                | Uop.RelBranchStage4 -> RelBranchStage4
+                | Uop.Nop -> fun _ -> FetchDummy <| ignore
+                | Uop.IncS -> IncS
+                | Uop.Jsr -> Jsr
+                | Uop.PullP -> PullP
+                | Uop.PullPcl -> PullPcl
+                | Uop.PullPchNoInc -> PullPchNoInc
+                | Uop.AbsReadLda -> AbsReadLda
+                | Uop.AbsReadLdy -> AbsReadLdy
+                | Uop.AbsReadLdx -> AbsReadLdx
+                | Uop.AbsReadBit -> AbsReadBit
+                | Uop.AbsReadLax -> AbsReadLax
+                | Uop.AbsReadAnd -> AbsReadAnd
+                | Uop.AbsReadEor -> AbsReadEor
+                | Uop.AbsReadOra -> AbsReadOra
+                | Uop.AbsReadAdc -> AbsReadAdc
+                | Uop.AbsReadCmp -> AbsReadCmp
+                | Uop.AbsReadCpy -> AbsReadCpy
+                | Uop.AbsReadNop -> AbsReadNop
+                | Uop.AbsReadCpx -> AbsReadCpx
+                | Uop.AbsReadSbc -> AbsReadSbc
+                | Uop.ZpIdxStage3X -> ZpIdxStage3X
+                | Uop.ZpIdxStage3Y -> ZpIdxStage3Y
+                | Uop.ZpIdxRmwStage4 -> ZpIdxRmwStage4
+                | Uop.ZpIdxRmwStage6 -> ZpIdxRmwStage6
+                | Uop.ZpReadEor -> ZpReadEor
+                | Uop.ZpReadBit -> ZpReadBit
+                | Uop.ZpReadLda -> ZpReadLda
+                | Uop.ZpReadLdy -> ZpReadLdy
+                | Uop.ZpReadLdx -> ZpReadLdx
+                | Uop.ZpReadLax -> ZpReadLax
+                | Uop.ZpReadCpy -> ZpReadCpy
+                | Uop.ZpReadCmp -> ZpReadCmp
+                | Uop.ZpReadCpx -> ZpReadCpx
+                | Uop.ZpReadOra -> ZpReadOra
+                | Uop.ZpReadNop -> ZpReadNop
+                | Uop.ZpReadSbc -> ZpReadSbc
+                | Uop.ZpReadAdc -> ZpReadAdc
+                | Uop.ZpReadAnd -> ZpReadAnd
+                | Uop.ImmEor -> ImmEor
+                | Uop.ImmAnc -> ImmAnc
+                | Uop.ImmAsr -> ImmAsr
+                | Uop.ImmAxs -> ImmAxs
+                | Uop.ImmArr -> ImmArr
+                | Uop.ImmLxa -> ImmLxa
+                | Uop.ImmOra -> ImmOra
+                | Uop.ImmCpy -> ImmCpy
+                | Uop.ImmCpx -> ImmCpx
+                | Uop.ImmCmp -> ImmCmp
+                | Uop.ImmSbc -> ImmSbc
+                | Uop.ImmAnd -> ImmAnd
+                | Uop.ImmAdc -> ImmAdc
+                | Uop.ImmLda -> ImmLda
+                | Uop.ImmLdx -> ImmLdx
+                | Uop.ImmLdy -> ImmLdy
+                | Uop.ImmUnsupported -> ImmUnsupported
+                | Uop.IdxIndStage3 -> IdxIndStage3
+                | Uop.IdxIndStage4 -> IdxIndStage4
+                | Uop.IdxIndStage5 -> IdxIndStage5
+                | Uop.IdxIndReadStage6Lda -> IdxIndReadStage6Lda
+                | Uop.IdxIndReadStage6Ora -> IdxIndReadStage6Ora
+                | Uop.IdxIndReadStage6Lax -> IdxIndReadStage6Lax
+                | Uop.IdxIndReadStage6Cmp -> IdxIndReadStage6Cmp
+                | Uop.IdxIndReadStage6Adc -> IdxIndReadStage6Adc
+                | Uop.IdxIndReadStage6And -> IdxIndReadStage6And
+                | Uop.IdxIndReadStage6Eor -> IdxIndReadStage6Eor
+                | Uop.IdxIndReadStage6Sbc -> IdxIndReadStage6Sbc
+                | Uop.IdxIndWriteStage6Sta -> IdxIndWriteStage6Sta
+                | Uop.IdxIndWriteStage6Sax -> IdxIndWriteStage6Sax
+                | Uop.IdxIndRmwStage6 -> IdxIndRmwStage6
+                | Uop.IdxIndRmwStage7Slo -> IdxIndRmwStage7Slo
+                | Uop.IdxIndRmwStage7Isc -> IdxIndRmwStage7Isc
+                | Uop.IdxIndRmwStage7Dcp -> IdxIndRmwStage7Dcp
+                | Uop.IdxIndRmwStage7Sre -> IdxIndRmwStage7Sre
+                | Uop.IdxIndRmwStage7Rra -> IdxIndRmwStage7Rra
+                | Uop.IdxIndRmwStage7Rla -> IdxIndRmwStage7Rla
+                | Uop.IdxIndRmwStage8 -> IdxIndRmwStage8
+                | Uop.PushP -> PushP
+                | Uop.PushA -> PushA
+                | Uop.PullANoInc -> PullANoInc
+                | Uop.PullPNoInc -> PullPNoInc
+                | Uop.ImpAslA -> ImpAslA
+                | Uop.ImpRolA -> ImpRolA
+                | Uop.ImpRorA -> ImpRorA
+                | Uop.ImpLsrA -> ImpLsrA
+                | Uop.JmpAbs -> JmpAbs
+                | Uop.IncPc -> IncPc
+                | Uop.ZpRmwStage3 -> ZpRmwStage3
+                | Uop.ZpRmwStage5 -> ZpRmwStage5
+                | Uop.ZpRmwInc -> ZpRmwInc
+                | Uop.ZpRmwDec -> ZpRmwDec
+                | Uop.ZpRmwAsl -> ZpRmwAsl
+                | Uop.ZpRmwSre -> ZpRmwSre
+                | Uop.ZpRmwRra -> ZpRmwRra
+                | Uop.ZpRmwDcp -> ZpRmwDcp
+                | Uop.ZpRmwLsr -> ZpRmwLsr
+                | Uop.ZpRmwRor -> ZpRmwRor
+                | Uop.ZpRmwRol -> ZpRmwRol
+                | Uop.ZpRmwSlo -> ZpRmwSlo
+                | Uop.ZpRmwIsc -> ZpRmwIsc
+                | Uop.ZpRmwRla -> ZpRmwRla
+                | Uop.AbsIdxStage3X -> AbsIdxStage3X
+                | Uop.AbsIdxStage3Y -> AbsIdxStage3Y
+                | Uop.AbsIdxReadStage4 -> AbsIdxReadStage4
+                | Uop.AbsIdxStage4 -> AbsIdxStage4
+                | Uop.AbsIdxWriteStage5Sta -> AbsIdxWriteStage5Sta
+                | Uop.AbsIdxWriteStage5Shy -> AbsIdxWriteStage5Shy
+                | Uop.AbsIdxWriteStage5Shx -> AbsIdxWriteStage5Shx
+                | Uop.AbsIdxWriteStage5Tas -> AbsIdxWriteStage5Tas
+                | Uop.AbsIdxRmwStage5 -> AbsIdxRmwStage5
+                | Uop.AbsIdxRmwStage7 -> AbsIdxRmwStage7
+                | Uop.AbsIdxRmwStage6Dec -> AbsIdxRmwStage6Dec
+                | Uop.AbsIdxRmwStage6Dcp -> AbsIdxRmwStage6Dcp
+                | Uop.AbsIdxRmwStage6Isc -> AbsIdxRmwStage6Isc
+                | Uop.AbsIdxRmwStage6Inc -> AbsIdxRmwStage6Inc
+                | Uop.AbsIdxRmwStage6Rol -> AbsIdxRmwStage6Rol
+                | Uop.AbsIdxRmwStage6Lsr -> AbsIdxRmwStage6Lsr
+                | Uop.AbsIdxRmwStage6Slo -> AbsIdxRmwStage6Slo
+                | Uop.AbsIdxRmwStage6Sre -> AbsIdxRmwStage6Sre
+                | Uop.AbsIdxRmwStage6Rra -> AbsIdxRmwStage6Rra
+                | Uop.AbsIdxRmwStage6Rla -> AbsIdxRmwStage6Rla
+                | Uop.AbsIdxRmwStage6Asl -> AbsIdxRmwStage6Asl
+                | Uop.AbsIdxRmwStage6Ror -> AbsIdxRmwStage6Ror
+                | Uop.AbsIdxReadStage5Lda -> AbsIdxReadStage5Lda
+                | Uop.AbsIdxReadStage5Ldx -> AbsIdxReadStage5Ldx
+                | Uop.AbsIdxReadStage5Lax -> AbsIdxReadStage5Lax
+                | Uop.AbsIdxReadStage5Ldy -> AbsIdxReadStage5Ldy
+                | Uop.AbsIdxReadStage5Ora -> AbsIdxReadStage5Ora
+                | Uop.AbsIdxReadStage5Nop -> AbsIdxReadStage5Nop
+                | Uop.AbsIdxReadStage5Cmp -> AbsIdxReadStage5Cmp
+                | Uop.AbsIdxReadStage5Sbc -> AbsIdxReadStage5Sbc
+                | Uop.AbsIdxReadStage5Adc -> AbsIdxReadStage5Adc
+                | Uop.AbsIdxReadStage5Eor -> AbsIdxReadStage5Eor
+                | Uop.AbsIdxReadStage5And -> AbsIdxReadStage5And
+                | Uop.AbsIdxReadStage5Las -> AbsIdxReadStage5Las
+                | Uop.AbsIndJmpStage4 -> AbsIndJmpStage4
+                | Uop.AbsIndJmpStage5 -> AbsIndJmpStage5
+                | Uop.AbsRmwStage4 -> AbsRmwStage4
+                | Uop.AbsRmwStage5Inc -> AbsRmwStage5Inc
+                | Uop.AbsRmwStage5Dec -> AbsRmwStage5Dec
+                | Uop.AbsRmwStage5Dcp -> AbsRmwStage5Dcp
+                | Uop.AbsRmwStage5Isc -> AbsRmwStage5Isc
+                | Uop.AbsRmwStage5Asl -> AbsRmwStage5Asl
+                | Uop.AbsRmwStage5Ror -> AbsRmwStage5Ror
+                | Uop.AbsRmwStage5Slo -> AbsRmwStage5Slo
+                | Uop.AbsRmwStage5Rla -> AbsRmwStage5Rla
+                | Uop.AbsRmwStage5Sre -> AbsRmwStage5Sre
+                | Uop.AbsRmwStage5Rra -> AbsRmwStage5Rra
+                | Uop.AbsRmwStage5Rol -> AbsRmwStage5Rol
+                | Uop.AbsRmwStage5Lsr -> AbsRmwStage5Lsr
+                | Uop.AbsRmwStage6 -> AbsRmwStage6
+                | Uop.EndISpecial -> EndISpecial
+                | Uop.EndSuppressInterrupt -> EndSuppressInterrupt
+                | Uop.End -> End
+                | Uop.EndBranchSpecial -> EndBranchSpecial
+                | _ -> fun _ -> ReadMemory 0xFFFF ignore |> ignore; false
 
-
-
-
-
-
-
-
-
-
+        if executed() then
+            mi <- mi + 1
         ()
