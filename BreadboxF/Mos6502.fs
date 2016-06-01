@@ -236,7 +236,7 @@ type Mos6502Configuration(lxaConstant:int, hasDecimalMode:bool) =
     member val LxaConstant = lxaConstant
     member val HasDecimalMode = hasDecimalMode
 
-type Mos6502(config:Mos6502Configuration, memory:IMemory) =
+type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let microCode =
         [|
             // 00
@@ -1681,8 +1681,11 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory) =
     // ----- Interface -----
 
 
-    member this.Clock () = ExecuteOneRetry()
+    member this.Clock () =
+        rdy <- ready.Rdy()
+        ExecuteOneRetry()
     member this.ClockMultiple count =
+        rdy <- ready.Rdy()
         let mutable remaining = count
         while remaining > 0 do
             ExecuteOneRetry()

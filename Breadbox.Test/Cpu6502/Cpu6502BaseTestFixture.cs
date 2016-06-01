@@ -12,6 +12,7 @@ namespace Breadbox.Test.Cpu6502
         private Stopwatch _stopwatch;
 
         protected Mock<IMemory> MemoryMock;
+        protected Mock<IReadySignal> ReadySignalMock;
         protected Mos6502 Cpu { get; private set; }
 
         [SetUp]
@@ -21,8 +22,9 @@ namespace Breadbox.Test.Cpu6502
             SetUpMocks();
 
             var memory = MemoryMock != null ? MemoryMock.Object : new MemoryNull();
+            var ready = ReadySignalMock != null ? ReadySignalMock.Object : new ReadySignalNull();
 
-            Cpu = new Mos6502(_config, memory);
+            Cpu = new Mos6502(_config, memory, ready);
             _stopwatch = new Stopwatch();
             _stopwatch.Start();
         }
@@ -34,7 +36,13 @@ namespace Breadbox.Test.Cpu6502
             Console.WriteLine("Elapsed time: {0}ms", _stopwatch.ElapsedMilliseconds);
         }
 
-        protected abstract Mos6502Configuration Config { get; }
+        protected virtual Mos6502Configuration Config
+        {
+            get
+            {
+                return new Mos6502Configuration(0xFF, true);
+            }
+        }
 
         protected virtual void SetUpMocks()
         {

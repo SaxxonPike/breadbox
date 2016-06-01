@@ -7,6 +7,9 @@ type IMemory =
 type IClock =
     abstract member Clock: unit -> unit
 
+type IReadySignal =
+    abstract member Rdy: unit -> bool
+
 type MemoryNull () =
     interface IMemory with
         member this.Read (address) = 0
@@ -15,3 +18,7 @@ type MemoryNull () =
 type ClockNull () =
     interface IClock with
         member this.Clock () = ()
+
+type ReadySignalNull () =
+    interface IReadySignal with
+        member this.Rdy () = true
