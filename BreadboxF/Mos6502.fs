@@ -572,7 +572,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 105 (VOP_IRQ)
             [| Uop.FetchDummy; Uop.FetchDummy; Uop.PushPch; Uop.PushPcl; Uop.PushPIrq; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
             // 106 (VOP_RESET)
-            [| Uop.FetchDummy; Uop.FetchDummy; Uop.FetchDummy; Uop.PushDummy; Uop.PushDummy; Uop.PushPReset; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
+            [| Uop.FetchDummy; Uop.FetchDummy; Uop.PushDummy; Uop.PushDummy; Uop.PushPReset; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
             // 107 (VOP_Fetch1_NoInterrupt)
             [| Uop.Fetch1Real |];
         |]
@@ -604,7 +604,8 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     [<Literal>]
     let brkVector = 0xFFFE
 
-    let mutable opcode = vopFetch1
+    let mutable restart = false
+    let mutable opcode = vopReset
     let mutable opcode2 = 0
     let mutable opcode3 = 0
     let mutable ea = 0
@@ -637,808 +638,805 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let mutable z = false
     let mutable c = false
 
-    let rec ExecuteOneRetry () =
-        let NZ value =
-            z <- (value &&& 0xFF) = 0
-            n <- (value &&& 0x80) <> 0
+    let GetP () =
+        0x20 |||
+        (if n then 0x80 else 0x00) |||
+        (if v then 0x40 else 0x00) |||
+        (if b then 0x10 else 0x00) |||
+        (if d then 0x08 else 0x00) |||
+        (if i then 0x04 else 0x00) |||
+        (if z then 0x02 else 0x00) |||
+        (if c then 0x01 else 0x00)
 
-        let NZA () =
-            NZ a
+    let SetP value =
+        n <- (value &&& 0x80) <> 0
+        v <- (value &&& 0x40) <> 0
+        b <- (value &&& 0x10) <> 0
+        d <- (value &&& 0x08) <> 0
+        i <- (value &&& 0x04) <> 0
+        z <- (value &&& 0x02) <> 0
+        c <- (value &&& 0x01) <> 0
 
-        let NZX () =
-            NZ x
+    let NZ value =
+        z <- (value &&& 0xFF) = 0
+        n <- (value &&& 0x80) <> 0
 
-        let NZY () =
-            NZ y
+    let NZA () =
+        NZ a
 
-        let ReadMemoryInternal address =
-            memory.Read address
+    let NZX () =
+        NZ x
 
-        let ReadMemory address operation =
-            if rdy then
-                ReadMemoryInternal address |> operation
-            rdy
+    let NZY () =
+        NZ y
 
-        let WriteMemory address value operation =
-            memory.Write(address, value)
-            value |> operation
-            true
+    let ReadMemoryInternal address =
+        memory.Read address
 
-        let ReadMemoryPcIncrement operation =
-            ReadMemory pc <| (fun mem ->
-                pc <- pc + 1
-                mem |> operation)
+    let ReadMemory address operation =
+        if rdy then
+            ReadMemoryInternal address |> operation
+        rdy
 
-        let ReadMemoryS operation =
-            ReadMemory (0x100 ||| s) <| operation
+    let WriteMemory address value operation =
+        memory.Write(address, value)
+        value |> operation
+        true
 
-        let WriteMemoryS value operation =
-            WriteMemory (0x100 ||| s) value <| operation
+    let ReadMemoryPcIncrement operation =
+        ReadMemory pc <| (fun mem ->
+            pc <- pc + 1
+            mem |> operation)
 
-        let Push value operation =
-            WriteMemoryS value <| (fun mem ->
-                mem |> operation
-                s <- (s - 1 &&& 0xFF))
+    let ReadMemoryS operation =
+        ReadMemory (0x100 ||| s) <| operation
 
-        let PushDiscard value = Push value <| ignore
+    let WriteMemoryS value operation =
+        WriteMemory (0x100 ||| s) value <| operation
 
-        let Pull operation =
-            ReadMemoryS <| (fun mem ->
-                mem |> operation
-                s <- (s + 1 &&& 0xFF))
+    let Push value operation =
+        WriteMemoryS value <| (fun mem ->
+            mem |> operation
+            s <- (s - 1 &&& 0xFF))
 
-        let GetP () =
-            0x20 |||
-            (if n then 0x80 else 0x00) |||
-            (if v then 0x40 else 0x00) |||
-            (if b then 0x10 else 0x00) |||
-            (if d then 0x08 else 0x00) |||
-            (if i then 0x04 else 0x00) |||
-            (if z then 0x02 else 0x00) |||
-            (if c then 0x01 else 0x00)
+    let PushDiscard value = Push value <| ignore
 
-        let SetP value =
-            n <- (value &&& 0x80) <> 0
-            v <- (value &&& 0x40) <> 0
-            b <- (value &&& 0x10) <> 0
-            d <- (value &&& 0x08) <> 0
-            i <- (value &&& 0x04) <> 0
-            z <- (value &&& 0x02) <> 0
-            c <- (value &&& 0x01) <> 0
+    let Pull operation =
+        ReadMemoryS <| (fun mem ->
+            mem |> operation
+            s <- (s + 1 &&& 0xFF))
 
-        let GetPcl () = pc &&& 0xFF
-        let GetPch () = pc >>> 8
-        let SetPc low high = pc <- (high <<< 8) ||| low
-        let SetPcl value = pc <- (pc &&& 0xFF00) ||| value
-        let SetPch value = pc <- (pc &&& 0x00FF) ||| (value <<< 8)
-        let SetA value =
-            a <- value
-        let SetNZA value =
-            SetA value
-            NZ a
-        let SetX value =
-            x <- value
-        let SetNZX value =
-            SetX value
-            NZ x
-        let SetY value =
-            y <- value
-        let SetNZY value =
-            SetY value
-            NZ y
-        let SetAlu value =
-            aluTemp <- value
-        let SetNZAlu value =
-            SetAlu value
-            NZ aluTemp
-        let SetOpcode2 value =
-            opcode2 <- value
-        let SetOpcode3 value =
-            opcode3 <- value
-        let AddOpcode2 value =
-            opcode2 <- (opcode2 + value) &&& 0xFF
-        let AddAluOpcode2 value =
-            aluTemp <- (opcode2 + value) &&& 0xFF
-        let SetLowEa value =
-            ea <- value
-        let SetHighEa value =
-            ea <- ea ||| (value <<< 8)
-        let SetPcJump value =
-            pc <- opcode2 ||| (value <<< 8)
+    let GetPcl () = pc &&& 0xFF
+    let GetPch () = pc >>> 8
+    let SetPc low high = pc <- (high <<< 8) ||| low
+    let SetPcl value = pc <- (pc &&& 0xFF00) ||| value
+    let SetPch value = pc <- (pc &&& 0x00FF) ||| (value <<< 8)
+    let SetNZA value =
+        a <- value
+        NZ a
+    let SetNZX value =
+        x <- value
+        NZ x
+    let SetNZY value =
+        y <- value
+        NZ y
+    let SetAlu value =
+        aluTemp <- value
+    let SetNZAlu value =
+        SetAlu value
+        NZ aluTemp
+    let SetOpcode2 value =
+        opcode2 <- value
+    let SetOpcode3 value =
+        opcode3 <- value
+    let AddOpcode2 value =
+        opcode2 <- (opcode2 + value) &&& 0xFF
+    let AddAluOpcode2 value =
+        aluTemp <- (opcode2 + value) &&& 0xFF
+    let SetLowEa value =
+        ea <- value
+    let SetHighEa value =
+        ea <- ea ||| (value <<< 8)
+    let SetPcJump value =
+        pc <- opcode2 ||| (value <<< 8)
 
-        let IfReady action =
-            if rdy then
-                action()
-            rdy
+    let IfReady action =
+        if rdy then
+            action()
+        rdy
 
 
-        // ----- ALU -----
+    // ----- ALU -----
 
 
-        let Cmp register value =
-            aluTemp <- (register - value) &&& 0xFF
-            c <- register >= aluTemp
-            NZ aluTemp
+    let Cmp register value =
+        aluTemp <- (register - value) &&& 0xFF
+        c <- register >= aluTemp
+        NZ aluTemp
 
-        let CmpA value = Cmp a value
-        let CmpX value = Cmp x value
-        let CmpY value = Cmp y value
+    let CmpA value = Cmp a value
+    let CmpX value = Cmp x value
+    let CmpY value = Cmp y value
 
-        let And value =
-            aluTemp <- a &&& value
-            a <- aluTemp
-            NZ a
+    let And value =
+        aluTemp <- a &&& value
+        a <- aluTemp
+        NZ a
 
-        let Bit value =
-            aluTemp <- value
-            n <- (aluTemp &&& 0x80) <> 0
-            v <- (aluTemp &&& 0x40) <> 0
-            z <- (a &&& aluTemp) = 0
+    let Bit value =
+        aluTemp <- value
+        n <- (aluTemp &&& 0x80) <> 0
+        v <- (aluTemp &&& 0x40) <> 0
+        z <- (a &&& aluTemp) = 0
 
-        let Eor value =
-            aluTemp <- a ^^^ value
-            a <- aluTemp
-            NZ a
+    let Eor value =
+        aluTemp <- a ^^^ value
+        a <- aluTemp
+        NZ a
 
-        let Ora value =
-            aluTemp <- a ||| value
-            a <- aluTemp
-            NZ a
+    let Ora value =
+        aluTemp <- a ||| value
+        a <- aluTemp
+        NZ a
 
-        let Anc value =
-            aluTemp <- a &&& value
-            c <- (aluTemp &&& 0x80) <> 0
-            a <- aluTemp
-            NZ a
+    let Anc value =
+        aluTemp <- a &&& value
+        c <- (aluTemp &&& 0x80) <> 0
+        a <- aluTemp
+        NZ a
 
-        let Asr value =
-            aluTemp <- value
-            let anded = a &&& aluTemp
-            c <- (anded &&& 0x01) <> 0
-            aluTemp <- anded >>> 1
-            a <- aluTemp
-            NZ a
+    let Asr value =
+        aluTemp <- value
+        let anded = a &&& aluTemp
+        c <- (anded &&& 0x01) <> 0
+        aluTemp <- anded >>> 1
+        a <- aluTemp
+        NZ a
 
-        let Axs value =
-            aluTemp <- value
-            x <- x &&& a
-            aluTemp <- (x - aluTemp)
-            x <- aluTemp &&& 0xFF
-            c <- (aluTemp &&& 0x100) = 0
-            NZ x
+    let Axs value =
+        aluTemp <- value
+        x <- x &&& a
+        aluTemp <- (x - aluTemp)
+        x <- aluTemp &&& 0xFF
+        c <- (aluTemp &&& 0x100) = 0
+        NZ x
 
-        let Arr value =
-            aluTemp <-
-                let initialMask = a &&& value
-                let binaryResult = (initialMask >>> 1) ||| (if c then 0x80 else 0x00)
-                if isDecimalMode then
-                    n <- (a &&& 0x80) <> 0
-                    z <- binaryResult = 0
-                    v <- (binaryResult ^^^ initialMask) &&& 0x40 <> 0
-                    let lowResult =
-                        if ((initialMask &&& 0xf) + (initialMask &&& 0x1)) > 0x5 then
-                            (binaryResult &&& 0xf0) ||| ((binaryResult + 0x6) &&& 0xf)
-                        else
-                            binaryResult
-                    if ((initialMask &&& 0xf0) + (initialMask &&& 0x10)) > 0x50 then
-                        c <- true
-                        (lowResult &&& 0x0f) ||| ((lowResult + 0x60) &&& 0xf0)
+    let Arr value =
+        aluTemp <-
+            let initialMask = a &&& value
+            let binaryResult = (initialMask >>> 1) ||| (if c then 0x80 else 0x00)
+            if isDecimalMode then
+                n <- (a &&& 0x80) <> 0
+                z <- binaryResult = 0
+                v <- (binaryResult ^^^ initialMask) &&& 0x40 <> 0
+                let lowResult =
+                    if ((initialMask &&& 0xf) + (initialMask &&& 0x1)) > 0x5 then
+                        (binaryResult &&& 0xf0) ||| ((binaryResult + 0x6) &&& 0xf)
                     else
-                        c <- false
-                        lowResult
+                        binaryResult
+                if ((initialMask &&& 0xf0) + (initialMask &&& 0x10)) > 0x50 then
+                    c <- true
+                    (lowResult &&& 0x0f) ||| ((lowResult + 0x60) &&& 0xf0)
                 else
-                    NZ binaryResult
-                    c <- (binaryResult &&& 0x40) <> 0
-                    v <- (binaryResult &&& 0x40) <> ((binaryResult &&& 0x20) <<< 1)
-                    binaryResult
-            a <- aluTemp
+                    c <- false
+                    lowResult
+            else
+                NZ binaryResult
+                c <- (binaryResult &&& 0x40) <> 0
+                v <- (binaryResult &&& 0x40) <> ((binaryResult &&& 0x20) <<< 1)
+                binaryResult
+        a <- aluTemp
 
-        let Lxa value =
-            aluTemp <- (a ||| config.LxaConstant) &&& value
-            a <- aluTemp
-            x <- aluTemp
-            NZ a
+    let Lxa value =
+        aluTemp <- (a ||| config.LxaConstant) &&& value
+        a <- aluTemp
+        x <- aluTemp
+        NZ a
 
-        let Sbc value =
-            let inline setV input result =
-                v <- ((a ^^^ input) &&& 0x80) &&& ((a ^^^ result) &&& 0x80) <> 0
-            aluTemp <-
-                let binaryResult = a - value - (if c then 0 else 1)
-                if isDecimalMode then
-                    let initialSub = (a &&& 0x0F) - (value &&& 0x0F) - (if c then 0 else 1)
-                    let adjustedSub =
-                        if (initialSub &&& 0x10) <> 0 then
-                            ((initialSub - 6) &&& 0x0F) ||| ((a &&& 0xF0) - (value &&& 0xF0) - 0x10)
-                        else
-                            (initialSub &&& 0x0F) ||| ((a &&& 0xF0) - (value &&& 0xF0))
-                    let result = (if (adjustedSub &&& 0x100) <> 0 then (adjustedSub - 0x060) else adjustedSub)
-                    z <- (binaryResult &&& 0xFF) = 0
-                    n <- (binaryResult &&& 0x80) <> 0
-                    c <- binaryResult < 0x100
-                    setV value binaryResult
-                    result
-                else
-                    NZ binaryResult
-                    c <- binaryResult > 0xFF
-                    setV value binaryResult
-                    binaryResult
-            a <- aluTemp
-
-        let Adc value =
-            let inline setV input result =
-                v <- (((a ^^^ input) &&& 0x80) ^^^ 0x80) &&& ((a ^^^ result) &&& 0x80) <> 0
-            aluTemp <-
-                let binaryResult = value + a + (if c then 1 else 0)
-                if isDecimalMode then
-                    let initialAdd = (a &&& 0x0F) + (value &&& 0x0F) + (if c then 1 else 0)
-                    let adjustedAdd = initialAdd + (if initialAdd > 9 then 6 else 0)
-                    let result = (initialAdd &&& 0x0F) + (a &&& 0xF0) + (value &&& 0xF0) + (if adjustedAdd > 0x0F then 0x10 else 0x00)
-                    z <- (binaryResult &&& 0xFF) = 0
-                    n <- (result &&& 0x80) <> 0
-                    c <- (result &&& 0x1FF) > 0x0F0
-                    setV value result
-                    result
-                else
-                    NZ binaryResult
-                    c <- binaryResult > 0xFF
-                    setV aluTemp binaryResult
-                    binaryResult
-            a <- aluTemp
-
-        let Slo value =
-            c <- (value &&& 0x80) <> 0
-            aluTemp <- ((value <<< 1) &&& 0xFF) ||| a
-            a <- aluTemp
-            NZ a
-
-        let Isc value =
-            (value + 1) &&& 0xFF |> Sbc
-
-        let Dcp value =
-            c <- (value &&& 0x01) <> 0
-            (value - 1) &&& 0xFF |> CmpA
-
-        let Sre value =
-            c <- (value &&& 0x01) <> 0
-            aluTemp <- ((value >>> 1) &&& 0xFF) ^^^ a
-            a <- aluTemp
-            NZ a
-
-        let Rra value =
-            let oldC = c
-            c <- (value &&& 0x01) <> 0
-            (value >>> 1) ||| (if oldC then 0x80 else 0x00) |> Adc
-
-        let Rla value =
-            let oldC = c
-            c <- (value &&& 0x80) <> 0
-            aluTemp <- (((value <<< 1) &&& 0xFF) ||| (if oldC then 0x01 else 0x00)) &&& a
-            a <- aluTemp
-            NZ aluTemp
-
-        let Lsr value =
-            aluTemp <- value
-            c <- (aluTemp &&& 0x01) <> 0
-            aluTemp <- aluTemp >>> 1
-            NZ aluTemp
-
-        let LsrA () =
-            Lsr a
-            a <- aluTemp
-
-        let Asl value =
-            aluTemp <- value
-            c <- (aluTemp &&& 0x80) <> 0
-            aluTemp <- (aluTemp <<< 1) &&& 0xFF
-            NZ aluTemp
-
-        let AslA () =
-            Asl a
-            a <- aluTemp
-
-        let Inc value =
-            aluTemp <- (value + 1) &&& 0xFF
-            NZ aluTemp
-
-        let Dec value =
-            aluTemp <- (value - 1) &&& 0xFF
-            NZ aluTemp
-
-        let Lda value =
-            a <- value
-            NZ a
-
-        let Ldx value =
-            x <- value
-            NZ x
-
-        let Ldy value =
-            y <- value
-            NZ y
-
-        let Lax value =
-            x <- value
-            a <- value
-            NZ a
-
-        let Rol value =
-            let oldC = c
-            c <- (aluTemp &&& 0x80) <> 0
-            aluTemp <- ((a <<< 1) &&& 0xFF) ||| (if oldC then 0x01 else 0x00)
-            NZ aluTemp
-
-        let RolA () =
-            Rol a
-            a <- aluTemp
-
-        let Ror value =
-            let oldC = c
-            c <- (aluTemp &&& 0x01) <> 0
-            aluTemp <- (a >>> 1) ||| (if oldC then 0x80 else 0x00)
-            NZ aluTemp
-
-        let RorA () =
-            Ror a
-            a <- aluTemp
-
-
-        // ----- uOPS -----
-
-
-        let FetchDiscard address operation = ReadMemory address (fun _ -> operation())
-        let FetchDummy = FetchDiscard pc
-
-        let Fetch1RealInternal () =
-            opcode <- ReadMemoryInternal pc
-            branchIrqHack <- false
-            mi <- -1
-            pc <- (pc + 1) &&& 0xFFFF
-
-        let Fetch1Real () =
-            IfReady <| Fetch1RealInternal
-
-        let Fetch1 () =
-            IfReady <| (fun _ ->
-                myIFlag <- i
-                i <- iFlagPending
-                if not branchIrqHack then
-                    interruptPending <- false
-                    if nmi then
-                        ea <- nmiVector
-                        opcode <- vopNmi
-                        nmi <- false
-                        mi <- 0
-                        ExecuteOneRetry()
+    let Sbc value =
+        let inline setV input result =
+            v <- ((a ^^^ input) &&& 0x80) &&& ((a ^^^ result) &&& 0x80) <> 0
+        aluTemp <-
+            let binaryResult = a - value - (if c then 0 else 1)
+            if isDecimalMode then
+                let initialSub = (a &&& 0x0F) - (value &&& 0x0F) - (if c then 0 else 1)
+                let adjustedSub =
+                    if (initialSub &&& 0x10) <> 0 then
+                        ((initialSub - 6) &&& 0x0F) ||| ((a &&& 0xF0) - (value &&& 0xF0) - 0x10)
                     else
-                        if irq && (not myIFlag) then
-                            ea <- irqVector
-                            opcode <- vopIrq
-                            mi <- 0
-                            ExecuteOneRetry()
-                else
-                    Fetch1RealInternal())
+                        (initialSub &&& 0x0F) ||| ((a &&& 0xF0) - (value &&& 0xF0))
+                let result = (if (adjustedSub &&& 0x100) <> 0 then (adjustedSub - 0x060) else adjustedSub)
+                z <- (binaryResult &&& 0xFF) = 0
+                n <- (binaryResult &&& 0x80) <> 0
+                c <- binaryResult < 0x100
+                setV value binaryResult
+                result
+            else
+                NZ binaryResult
+                c <- binaryResult > 0xFF
+                setV value binaryResult
+                binaryResult
+        a <- aluTemp
 
-        let Fetch2 () = ReadMemoryPcIncrement <| SetOpcode2
-        let Fetch3 () = ReadMemoryPcIncrement <| SetOpcode3
-        let PushPch () = Push (GetPch()) <| ignore
-        let PushPcl () = Push (GetPcl()) <| ignore
+    let Adc value =
+        let inline setV input result =
+            v <- (((a ^^^ input) &&& 0x80) ^^^ 0x80) &&& ((a ^^^ result) &&& 0x80) <> 0
+        aluTemp <-
+            let binaryResult = value + a + (if c then 1 else 0)
+            if isDecimalMode then
+                let initialAdd = (a &&& 0x0F) + (value &&& 0x0F) + (if c then 1 else 0)
+                let adjustedAdd = initialAdd + (if initialAdd > 9 then 6 else 0)
+                let result = (initialAdd &&& 0x0F) + (a &&& 0xF0) + (value &&& 0xF0) + (if adjustedAdd > 0x0F then 0x10 else 0x00)
+                z <- (binaryResult &&& 0xFF) = 0
+                n <- (result &&& 0x80) <> 0
+                c <- (result &&& 0x1FF) > 0x0F0
+                setV value result
+                result
+            else
+                NZ binaryResult
+                c <- binaryResult > 0xFF
+                setV aluTemp binaryResult
+                binaryResult
+        a <- aluTemp
 
-        let PushPInterrupt newB newEa =
-            b <- newB
-            Push (GetP()) <| fun _ ->
-                i <- true
-                ea <- newEa
+    let Slo value =
+        c <- (value &&& 0x80) <> 0
+        aluTemp <- ((value <<< 1) &&& 0xFF) ||| a
+        a <- aluTemp
+        NZ a
 
-        let PushPBrk () =
-            PushPInterrupt true brkVector
+    let Isc value =
+        (value + 1) &&& 0xFF |> Sbc
 
-        let PushPIrq () =
-            PushPInterrupt false irqVector
-            
-        let PushPNmi () =
-            PushPInterrupt false nmiVector
+    let Dcp value =
+        c <- (value &&& 0x01) <> 0
+        (value - 1) &&& 0xFF |> CmpA
 
-        let PushPReset () =
-            PushPInterrupt false resetVector
+    let Sre value =
+        c <- (value &&& 0x01) <> 0
+        aluTemp <- ((value >>> 1) &&& 0xFF) ^^^ a
+        a <- aluTemp
+        NZ a
 
-        let PushDummy () =
-            IfReady <| fun _ -> s <- (s - 1) &&& 0xFF
+    let Rra value =
+        let oldC = c
+        c <- (value &&& 0x01) <> 0
+        (value >>> 1) ||| (if oldC then 0x80 else 0x00) |> Adc
 
-        let FetchPclVector () =
-            IfReady <| fun _ ->
-                if nmi && ((ea = brkVector && b) || (ea = irqVector && (not b))) then
-                    nmi <- false
+    let Rla value =
+        let oldC = c
+        c <- (value &&& 0x80) <> 0
+        aluTemp <- (((value <<< 1) &&& 0xFF) ||| (if oldC then 0x01 else 0x00)) &&& a
+        a <- aluTemp
+        NZ aluTemp
+
+    let Lsr value =
+        aluTemp <- value
+        c <- (aluTemp &&& 0x01) <> 0
+        aluTemp <- aluTemp >>> 1
+        NZ aluTemp
+
+    let LsrA () =
+        Lsr a
+        a <- aluTemp
+
+    let Asl value =
+        aluTemp <- value
+        c <- (aluTemp &&& 0x80) <> 0
+        aluTemp <- (aluTemp <<< 1) &&& 0xFF
+        NZ aluTemp
+
+    let AslA () =
+        Asl a
+        a <- aluTemp
+
+    let Inc value =
+        aluTemp <- (value + 1) &&& 0xFF
+        NZ aluTemp
+
+    let Dec value =
+        aluTemp <- (value - 1) &&& 0xFF
+        NZ aluTemp
+
+    let Lda value =
+        a <- value
+        NZ a
+
+    let Ldx value =
+        x <- value
+        NZ x
+
+    let Ldy value =
+        y <- value
+        NZ y
+
+    let Lax value =
+        x <- value
+        a <- value
+        NZ a
+
+    let Rol value =
+        let oldC = c
+        c <- (aluTemp &&& 0x80) <> 0
+        aluTemp <- ((a <<< 1) &&& 0xFF) ||| (if oldC then 0x01 else 0x00)
+        NZ aluTemp
+
+    let RolA () =
+        Rol a
+        a <- aluTemp
+
+    let Ror value =
+        let oldC = c
+        c <- (aluTemp &&& 0x01) <> 0
+        aluTemp <- (a >>> 1) ||| (if oldC then 0x80 else 0x00)
+        NZ aluTemp
+
+    let RorA () =
+        Ror a
+        a <- aluTemp
+
+
+    // ----- uOPS -----
+
+
+    let FetchDiscard address operation = ReadMemory address (fun _ -> operation())
+    let FetchDummy = FetchDiscard pc
+
+    let Fetch1RealInternal () =
+        opcode <- ReadMemoryInternal pc
+        branchIrqHack <- false
+        mi <- -1
+        pc <- (pc + 1) &&& 0xFFFF
+
+    let Fetch1Real () =
+        IfReady <| Fetch1RealInternal
+
+    let Fetch1 () =
+        IfReady <| fun _ ->
+            myIFlag <- i
+            i <- iFlagPending
+            if not branchIrqHack then
+                interruptPending <- false
+                if nmi then
                     ea <- nmiVector
-                aluTemp <- ReadMemoryInternal ea
+                    opcode <- vopNmi
+                    nmi <- false
+                    mi <- 0
+                    restart <- true
+                else
+                    if irq && (not myIFlag) then
+                        ea <- irqVector
+                        opcode <- vopIrq
+                        mi <- 0
+                        restart <- true
+            if restart then
+                ()
+            else
+                Fetch1RealInternal()
+
+    let Fetch2 () = ReadMemoryPcIncrement <| SetOpcode2
+    let Fetch3 () = ReadMemoryPcIncrement <| SetOpcode3
+    let PushPch () = Push (GetPch()) <| ignore
+    let PushPcl () = Push (GetPcl()) <| ignore
+
+    let PushPInterrupt newB newEa =
+        b <- newB
+        Push (GetP()) <| fun _ ->
+            i <- true
+            ea <- newEa
+
+    let PushPBrk () =
+        PushPInterrupt true brkVector
+
+    let PushPIrq () =
+        PushPInterrupt false irqVector
             
-        let FetchPchVector () =
-            IfReady <| fun _ ->
-                aluTemp <- aluTemp ||| (ReadMemoryInternal(ea) <<< 8)
-                pc <- aluTemp
+    let PushPNmi () =
+        PushPInterrupt false nmiVector
 
-        let Imp = FetchDummy
-        let ImpIny () = Imp <| fun _ -> (Inc y; y <- aluTemp)
-        let ImpDey () = Imp <| fun _ -> (Dec y; y <- aluTemp)
-        let ImpInx () = Imp <| fun _ -> (Inc x; x <- aluTemp)
-        let ImpDex () = Imp <| fun _ -> (Dec x; x <- aluTemp)
-        let ImpTsx () = Imp <| fun _ -> SetNZX s
-        let ImpTxs () = Imp <| fun _ -> s <- x
-        let ImpTax () = Imp <| fun _ -> SetNZX a
-        let ImpTay () = Imp <| fun _ -> SetNZY a
-        let ImpTya () = Imp <| fun _ -> SetNZA y
-        let ImpTxa () = Imp <| fun _ -> SetNZA x
-        let ImpSei () = Imp <| fun _ -> iFlagPending <- true
-        let ImpCli () = Imp <| fun _ -> iFlagPending <- false
-        let ImpSec () = Imp <| fun _ -> c <- true
-        let ImpClc () = Imp <| fun _ -> c <- false
-        let ImpClv () = Imp <| fun _ -> v <- false
-        let ImpSed () = Imp <| fun _ -> (d <- true; isDecimalMode <- config.HasDecimalMode)
-        let ImpCld () = Imp <| fun _ -> (d <- false; isDecimalMode <- false)
+    let PushPReset () =
+        PushPInterrupt false resetVector
 
-        let AbsWrite value = WriteMemory ((opcode3 <<< 8) ||| opcode2) value <| ignore
-        let AbsWriteSta () = AbsWrite <| a
-        let AbsWriteStx () = AbsWrite <| x
-        let AbsWriteSty () = AbsWrite <| y
-        let AbsWriteSax () = AbsWrite <| (x &&& a)
+    let PushDummy () =
+        IfReady <| fun _ -> s <- (s - 1) &&& 0xFF
 
-        let ZpWrite value = WriteMemory opcode2 value <| ignore
-        let ZpWriteSta () = ZpWrite <| a
-        let ZpWriteStx () = ZpWrite <| x
-        let ZpWriteSty () = ZpWrite <| y
-        let ZpWriteSax () = ZpWrite <| (x &&& a)
-
-        let IndIdxStage3 () = ReadMemory opcode2 SetLowEa
-        let IndIdxStage4 () =
-            IfReady <| fun _ ->
-                aluTemp <- ea + y
-                ea <- ReadMemoryInternal <| (((opcode2 + 1) &&& 0xFF) <<< 8) ||| (aluTemp &&& 0xFF)
-
-        let IndIdxWriteStage5 () =
-            IfReady <| fun _ ->
-                ReadMemoryInternal ea |> ignore
-                ea <- ea + (aluTemp &&& 0xFF00)
-
-        let IndIdxReadStage5 () =
-            IfReady <| fun _ ->
-                if aluTemp >= 0x100 then
-                    mi <- mi + 1
-                    ExecuteOneRetry()
-                else
-                    ReadMemoryInternal ea |> ignore
-                    ea <- (ea + 0x100) &&& 0xFFFF
-
-        let IndIdxRmwStage5 () =
-            IfReady <| fun _ ->
-                if aluTemp >= 0x100 then
-                    ea <- (ea + 0x100) &&& 0xFFFF
-                ReadMemoryInternal ea |> ignore
-
-        let IndIdxWriteStage6 value = WriteMemory ea value <| ignore
-        let IndIdxWriteStage6Sta () = IndIdxWriteStage6 <| a
-        let IndIdxWriteStage6Sha () = IndIdxWriteStage6 <| (a &&& x &&& 7)
-
-        let IndIdxReadStage6 operation = ReadMemory ea <| operation
-        let IndIdxReadStage6Lda () = IndIdxReadStage6 <| Lda
-        let IndIdxReadStage6Cmp () = IndIdxReadStage6 <| CmpA
-        let IndIdxReadStage6And () = IndIdxReadStage6 <| And
-        let IndIdxReadStage6Eor () = IndIdxReadStage6 <| Eor
-        let IndIdxReadStage6Lax () = IndIdxReadStage6 <| Lax
-        let IndIdxReadStage6Adc () = IndIdxReadStage6 <| Adc
-        let IndIdxReadStage6Sbc () = IndIdxReadStage6 <| Sbc
-        let IndIdxReadStage6Ora () = IndIdxReadStage6 <| Ora
-
-        let IndIdxRmwStage6 () = ReadMemory ea <| SetAlu
-
-        let IndIdxRmwStage7 operation = WriteMemory ea aluTemp <| operation
-        let IndIdxRmwStage7Slo () = IndIdxRmwStage7 <| Slo
-        let IndIdxRmwStage7Sre () = IndIdxRmwStage7 <| Sre
-        let IndIdxRmwStage7Rra () = IndIdxRmwStage7 <| Rra
-        let IndIdxRmwStage7Isc () = IndIdxRmwStage7 <| Isc
-        let IndIdxRmwStage7Dcp () = IndIdxRmwStage7 <| Dcp
-        let IndIdxRmwStage7Rla () = IndIdxRmwStage7 <| Rla
-
-        let IndIdxRmwStage8 () = WriteMemory ea aluTemp <| ignore
-
-        let RelBranchStage2 branchTaken =
-            ReadMemoryPcIncrement (fun mem ->
-                opcode2 <- mem
-                if branchTaken then
-                    opcode <- vopRelativeStuff
-                    mi <- -1)
+    let FetchPclVector () =
+        IfReady <| fun _ ->
+            if nmi && ((ea = brkVector && b) || (ea = irqVector && (not b))) then
+                nmi <- false
+                ea <- nmiVector
+            aluTemp <- ReadMemoryInternal ea
             
-        let RelBranchStage2Bvs () = RelBranchStage2 v
-        let RelBranchStage2Bvc () = RelBranchStage2 (not v)
-        let RelBranchStage2Bmi () = RelBranchStage2 n
-        let RelBranchStage2Bpl () = RelBranchStage2 (not n)
-        let RelBranchStage2Bcs () = RelBranchStage2 c
-        let RelBranchStage2Bcc () = RelBranchStage2 (not c)
-        let RelBranchStage2Beq () = RelBranchStage2 z
-        let RelBranchStage2Bne () = RelBranchStage2 (not z)
+    let FetchPchVector () =
+        IfReady <| fun _ ->
+            aluTemp <- aluTemp ||| (ReadMemoryInternal(ea) <<< 8)
+            pc <- aluTemp
 
-        let RelBranchStage3 () =
-            FetchDummy <| fun _ ->
-                aluTemp <- (pc &&& 0xFF) + opcode2
-                pc <- (pc &&& 0xFF00) ||| (aluTemp &&& 0xFF)
-                if aluTemp >= 0x100 then
-                    opcode <- vopRelativeStuff2
-                    mi <- -1
-                else
-                    if interruptPending then
-                        branchIrqHack <- true
+    let Imp = FetchDummy
+    let ImpIny () = Imp <| fun _ -> (Inc y; y <- aluTemp)
+    let ImpDey () = Imp <| fun _ -> (Dec y; y <- aluTemp)
+    let ImpInx () = Imp <| fun _ -> (Inc x; x <- aluTemp)
+    let ImpDex () = Imp <| fun _ -> (Dec x; x <- aluTemp)
+    let ImpTsx () = Imp <| fun _ -> SetNZX s
+    let ImpTxs () = Imp <| fun _ -> s <- x
+    let ImpTax () = Imp <| fun _ -> SetNZX a
+    let ImpTay () = Imp <| fun _ -> SetNZY a
+    let ImpTya () = Imp <| fun _ -> SetNZA y
+    let ImpTxa () = Imp <| fun _ -> SetNZA x
+    let ImpSei () = Imp <| fun _ -> iFlagPending <- true
+    let ImpCli () = Imp <| fun _ -> iFlagPending <- false
+    let ImpSec () = Imp <| fun _ -> c <- true
+    let ImpClc () = Imp <| fun _ -> c <- false
+    let ImpClv () = Imp <| fun _ -> v <- false
+    let ImpSed () = Imp <| fun _ -> (d <- true; isDecimalMode <- config.HasDecimalMode)
+    let ImpCld () = Imp <| fun _ -> (d <- false; isDecimalMode <- false)
 
-        let RelBranchStage4 () =
-            FetchDummy <| fun _ ->
-                pc <- (pc + (if aluTemp < 0 then -256 else 256)) &&& 0xFFFF
+    let AbsWrite value = WriteMemory ((opcode3 <<< 8) ||| opcode2) value <| ignore
+    let AbsWriteSta () = AbsWrite <| a
+    let AbsWriteStx () = AbsWrite <| x
+    let AbsWriteSty () = AbsWrite <| y
+    let AbsWriteSax () = AbsWrite <| (x &&& a)
 
-        let IncS () = FetchDummy <| fun _ -> s <- (s + 1) &&& 0xFF
-        let Jsr () = ReadMemory pc <| SetPcJump
-        let PullP () = Pull <| SetP
-        let PullPcl () = Pull <| SetPcl
-        let PullPchNoInc () =
-            IfReady <| fun _ -> pc <- (pc &&& 0x00FF) ||| (ReadMemoryInternal(0x0100 ||| s) <<< 8)
+    let ZpWrite value = WriteMemory opcode2 value <| ignore
+    let ZpWriteSta () = ZpWrite <| a
+    let ZpWriteStx () = ZpWrite <| x
+    let ZpWriteSty () = ZpWrite <| y
+    let ZpWriteSax () = ZpWrite <| (x &&& a)
 
-        let AbsRead operation = ReadMemory ((opcode3 <<< 8) ||| opcode2) <| operation
-        let AbsReadLda () = AbsRead <| SetNZA
-        let AbsReadLdy () = AbsRead <| SetNZY
-        let AbsReadLdx () = AbsRead <| SetNZX
-        let AbsReadBit () = AbsRead <| Bit
-        let AbsReadLax () = AbsRead <| Lax
-        let AbsReadAnd () = AbsRead <| And
-        let AbsReadEor () = AbsRead <| Eor
-        let AbsReadOra () = AbsRead <| Ora
-        let AbsReadAdc () = AbsRead <| Adc
-        let AbsReadCmp () = AbsRead <| CmpA
-        let AbsReadCpy () = AbsRead <| CmpY
-        let AbsReadNop () = AbsRead <| ignore
-        let AbsReadCpx () = AbsRead <| CmpX
-        let AbsReadSbc () = AbsRead <| Sbc
+    let IndIdxStage3 () = ReadMemory opcode2 SetLowEa
+    let IndIdxStage4 () =
+        IfReady <| fun _ ->
+            aluTemp <- ea + y
+            ea <- ReadMemoryInternal <| (((opcode2 + 1) &&& 0xFF) <<< 8) ||| (aluTemp &&& 0xFF)
 
-        let ZpIdxStage3 value = ReadMemory opcode2 <| AddOpcode2         
-        let ZpIdxStage3X () = ZpIdxStage3 <| x
-        let ZpIdxStage3Y () = ZpIdxStage3 <| y
+    let IndIdxWriteStage5 () =
+        IfReady <| fun _ ->
+            ReadMemoryInternal ea |> ignore
+            ea <- ea + (aluTemp &&& 0xFF00)
 
-        let ZpIdxRmwStage4 () = ReadMemory opcode2 <| SetAlu
-        let ZpIdxRmwStage6 () = WriteMemory opcode2 aluTemp <| ignore
+    let IndIdxReadStage5 () =
+        IfReady <| fun _ ->
+            if aluTemp >= 0x100 then
+                mi <- mi + 1
+                restart <- true
+            else
+                ReadMemoryInternal ea |> ignore
+                ea <- (ea + 0x100) &&& 0xFFFF
 
-        let ZpRead operation = ReadMemory opcode2 <| operation
-        let ZpReadEor () = ZpRead <| Eor
-        let ZpReadBit () = ZpRead <| Bit
-        let ZpReadLda () = ZpRead <| Lda
-        let ZpReadLdy () = ZpRead <| Ldy
-        let ZpReadLdx () = ZpRead <| Ldx
-        let ZpReadLax () = ZpRead <| Lax
-        let ZpReadCpy () = ZpRead <| CmpY
-        let ZpReadCmp () = ZpRead <| CmpA
-        let ZpReadCpx () = ZpRead <| CmpX
-        let ZpReadOra () = ZpRead <| Ora
-        let ZpReadNop () = ZpRead <| ignore
-        let ZpReadSbc () = ZpRead <| Sbc
-        let ZpReadAdc () = ZpRead <| Adc
-        let ZpReadAnd () = ZpRead <| And
+    let IndIdxRmwStage5 () =
+        IfReady <| fun _ ->
+            if aluTemp >= 0x100 then
+                ea <- (ea + 0x100) &&& 0xFFFF
+            ReadMemoryInternal ea |> ignore
 
-        let Imm operation = ReadMemoryPcIncrement <| operation
-        let ImmEor () = Imm <| Eor
-        let ImmAnc () = Imm <| Anc
-        let ImmAsr () = Imm <| Asr
-        let ImmAxs () = Imm <| Axs
-        let ImmArr () = Imm <| Arr
-        let ImmLxa () = Imm <| Lxa
-        let ImmOra () = Imm <| Ora
-        let ImmCpy () = Imm <| CmpY
-        let ImmCpx () = Imm <| CmpX
-        let ImmCmp () = Imm <| CmpA
-        let ImmSbc () = Imm <| Sbc
-        let ImmAnd () = Imm <| And
-        let ImmAdc () = Imm <| Adc
-        let ImmLda () = Imm <| Lda
-        let ImmLdx () = Imm <| Ldx
-        let ImmLdy () = Imm <| Ldy
-        let ImmUnsupported () = Imm <| ignore
+    let IndIdxWriteStage6 value = WriteMemory ea value <| ignore
+    let IndIdxWriteStage6Sta () = IndIdxWriteStage6 <| a
+    let IndIdxWriteStage6Sha () = IndIdxWriteStage6 <| (a &&& x &&& 7)
 
-        let IdxIndStage3 () = ReadMemory opcode2 <| AddAluOpcode2
-        let IdxIndStage4 () = ReadMemory aluTemp <| SetLowEa
-        let IdxIndStage5 () = ReadMemory (aluTemp + 1) <| SetHighEa
+    let IndIdxReadStage6 operation = ReadMemory ea <| operation
+    let IndIdxReadStage6Lda () = IndIdxReadStage6 <| Lda
+    let IndIdxReadStage6Cmp () = IndIdxReadStage6 <| CmpA
+    let IndIdxReadStage6And () = IndIdxReadStage6 <| And
+    let IndIdxReadStage6Eor () = IndIdxReadStage6 <| Eor
+    let IndIdxReadStage6Lax () = IndIdxReadStage6 <| Lax
+    let IndIdxReadStage6Adc () = IndIdxReadStage6 <| Adc
+    let IndIdxReadStage6Sbc () = IndIdxReadStage6 <| Sbc
+    let IndIdxReadStage6Ora () = IndIdxReadStage6 <| Ora
 
-        let IdxIndReadStage6 = ReadMemory ea
-        let IdxIndReadStage6Lda () = IdxIndReadStage6 <| Lda
-        let IdxIndReadStage6Ora () = IdxIndReadStage6 <| Ora
-        let IdxIndReadStage6Lax () = IdxIndReadStage6 <| Lax
-        let IdxIndReadStage6Cmp () = IdxIndReadStage6 <| CmpA
-        let IdxIndReadStage6Adc () = IdxIndReadStage6 <| Adc
-        let IdxIndReadStage6And () = IdxIndReadStage6 <| And
-        let IdxIndReadStage6Eor () = IdxIndReadStage6 <| Eor
-        let IdxIndReadStage6Sbc () = IdxIndReadStage6 <| Sbc
+    let IndIdxRmwStage6 () = ReadMemory ea <| SetAlu
 
-        let IdxIndWriteStage6 value = WriteMemory ea value <| ignore
-        let IdxIndWriteStage6Sta () = IdxIndWriteStage6 <| a
-        let IdxIndWriteStage6Sax () = IdxIndWriteStage6 <| (a &&& x)
+    let IndIdxRmwStage7 operation = WriteMemory ea aluTemp <| operation
+    let IndIdxRmwStage7Slo () = IndIdxRmwStage7 <| Slo
+    let IndIdxRmwStage7Sre () = IndIdxRmwStage7 <| Sre
+    let IndIdxRmwStage7Rra () = IndIdxRmwStage7 <| Rra
+    let IndIdxRmwStage7Isc () = IndIdxRmwStage7 <| Isc
+    let IndIdxRmwStage7Dcp () = IndIdxRmwStage7 <| Dcp
+    let IndIdxRmwStage7Rla () = IndIdxRmwStage7 <| Rla
 
-        let IdxIndRmwStage6 () = ReadMemory ea <| SetAlu
+    let IndIdxRmwStage8 () = WriteMemory ea aluTemp <| ignore
 
-        let IdxIndRmwStage7 = WriteMemory ea aluTemp
-        let IdxIndRmwStage7Slo () = IdxIndRmwStage7 <| Slo
-        let IdxIndRmwStage7Sre () = IdxIndRmwStage7 <| Sre
-        let IdxIndRmwStage7Rra () = IdxIndRmwStage7 <| Rra
-        let IdxIndRmwStage7Isc () = IdxIndRmwStage7 <| Isc
-        let IdxIndRmwStage7Dcp () = IdxIndRmwStage7 <| Dcp
-        let IdxIndRmwStage7Rla () = IdxIndRmwStage7 <| Rla
+    let RelBranchStage2 branchTaken =
+        ReadMemoryPcIncrement (fun mem ->
+            opcode2 <- mem
+            if branchTaken then
+                opcode <- vopRelativeStuff
+                mi <- -1)
+            
+    let RelBranchStage2Bvs () = RelBranchStage2 v
+    let RelBranchStage2Bvc () = RelBranchStage2 (not v)
+    let RelBranchStage2Bmi () = RelBranchStage2 n
+    let RelBranchStage2Bpl () = RelBranchStage2 (not n)
+    let RelBranchStage2Bcs () = RelBranchStage2 c
+    let RelBranchStage2Bcc () = RelBranchStage2 (not c)
+    let RelBranchStage2Beq () = RelBranchStage2 z
+    let RelBranchStage2Bne () = RelBranchStage2 (not z)
 
-        let IdxIndRmwStage8 () = WriteMemory ea aluTemp <| ignore
+    let RelBranchStage3 () =
+        FetchDummy <| fun _ ->
+            aluTemp <- (pc &&& 0xFF) + opcode2
+            pc <- (pc &&& 0xFF00) ||| (aluTemp &&& 0xFF)
+            if aluTemp >= 0x100 then
+                opcode <- vopRelativeStuff2
+                mi <- -1
+            else
+                if interruptPending then
+                    branchIrqHack <- true
 
-        let PushP () =
-            b <- true
-            PushDiscard <| GetP()
+    let RelBranchStage4 () =
+        FetchDummy <| fun _ ->
+            pc <- (pc + (if aluTemp < 0 then -256 else 256)) &&& 0xFFFF
 
-        let PushA () = PushDiscard a
+    let IncS () = FetchDummy <| fun _ -> s <- (s + 1) &&& 0xFF
+    let Jsr () = ReadMemory pc <| SetPcJump
+    let PullP () = Pull <| SetP
+    let PullPcl () = Pull <| SetPcl
+    let PullPchNoInc () =
+        IfReady <| fun _ -> pc <- (pc &&& 0x00FF) ||| (ReadMemoryInternal(0x0100 ||| s) <<< 8)
 
-        let PullPNoInc () =
-            ReadMemoryS <| fun mem ->
-                myIFlag <- i
-                SetP mem
-                iFlagPending <- i
-                i <- myIFlag
+    let AbsRead operation = ReadMemory ((opcode3 <<< 8) ||| opcode2) <| operation
+    let AbsReadLda () = AbsRead <| SetNZA
+    let AbsReadLdy () = AbsRead <| SetNZY
+    let AbsReadLdx () = AbsRead <| SetNZX
+    let AbsReadBit () = AbsRead <| Bit
+    let AbsReadLax () = AbsRead <| Lax
+    let AbsReadAnd () = AbsRead <| And
+    let AbsReadEor () = AbsRead <| Eor
+    let AbsReadOra () = AbsRead <| Ora
+    let AbsReadAdc () = AbsRead <| Adc
+    let AbsReadCmp () = AbsRead <| CmpA
+    let AbsReadCpy () = AbsRead <| CmpY
+    let AbsReadNop () = AbsRead <| ignore
+    let AbsReadCpx () = AbsRead <| CmpX
+    let AbsReadSbc () = AbsRead <| Sbc
 
-        let PullANoInc () = ReadMemoryS <| SetA
+    let ZpIdxStage3 value = ReadMemory opcode2 <| AddOpcode2         
+    let ZpIdxStage3X () = ZpIdxStage3 <| x
+    let ZpIdxStage3Y () = ZpIdxStage3 <| y
 
-        let Imp operation = FetchDummy <| operation
-        let ImpAslA () = Imp <| AslA
-        let ImpRolA () = Imp <| RolA
-        let ImpRorA () = Imp <| RorA
-        let ImpLsrA () = Imp <| LsrA
+    let ZpIdxRmwStage4 () = ReadMemory opcode2 <| SetAlu
+    let ZpIdxRmwStage6 () = WriteMemory opcode2 aluTemp <| ignore
 
-        let JmpAbs () = ReadMemory pc <| SetPcJump
-        let IncPc () = FetchDummy <| fun _ -> pc <- (pc + 1) &&& 0xFFFF
+    let ZpRead operation = ReadMemory opcode2 <| operation
+    let ZpReadEor () = ZpRead <| Eor
+    let ZpReadBit () = ZpRead <| Bit
+    let ZpReadLda () = ZpRead <| Lda
+    let ZpReadLdy () = ZpRead <| Ldy
+    let ZpReadLdx () = ZpRead <| Ldx
+    let ZpReadLax () = ZpRead <| Lax
+    let ZpReadCpy () = ZpRead <| CmpY
+    let ZpReadCmp () = ZpRead <| CmpA
+    let ZpReadCpx () = ZpRead <| CmpX
+    let ZpReadOra () = ZpRead <| Ora
+    let ZpReadNop () = ZpRead <| ignore
+    let ZpReadSbc () = ZpRead <| Sbc
+    let ZpReadAdc () = ZpRead <| Adc
+    let ZpReadAnd () = ZpRead <| And
 
-        let ZpRmwStage3 () = ReadMemory opcode2 <| SetAlu
-        let ZpRmwStage5 () = WriteMemory opcode2 aluTemp <| ignore
-        let ZpRmw operation = WriteMemory opcode2 aluTemp <| operation
+    let Imm operation = ReadMemoryPcIncrement <| operation
+    let ImmEor () = Imm <| Eor
+    let ImmAnc () = Imm <| Anc
+    let ImmAsr () = Imm <| Asr
+    let ImmAxs () = Imm <| Axs
+    let ImmArr () = Imm <| Arr
+    let ImmLxa () = Imm <| Lxa
+    let ImmOra () = Imm <| Ora
+    let ImmCpy () = Imm <| CmpY
+    let ImmCpx () = Imm <| CmpX
+    let ImmCmp () = Imm <| CmpA
+    let ImmSbc () = Imm <| Sbc
+    let ImmAnd () = Imm <| And
+    let ImmAdc () = Imm <| Adc
+    let ImmLda () = Imm <| Lda
+    let ImmLdx () = Imm <| Ldx
+    let ImmLdy () = Imm <| Ldy
+    let ImmUnsupported () = Imm <| ignore
 
-        let ZpRmwInc () = ZpRmw Inc
-        let ZpRmwDec () = ZpRmw Dec
-        let ZpRmwAsl () = ZpRmw Asl
-        let ZpRmwSre () = ZpRmw Sre
-        let ZpRmwRra () = ZpRmw Rra
-        let ZpRmwDcp () = ZpRmw Dcp
-        let ZpRmwLsr () = ZpRmw Lsr
-        let ZpRmwRor () = ZpRmw Ror
-        let ZpRmwRol () = ZpRmw Rol
-        let ZpRmwSlo () = ZpRmw Slo
-        let ZpRmwIsc () = ZpRmw Isc
-        let ZpRmwRla () = ZpRmw Rla
+    let IdxIndStage3 () = ReadMemory opcode2 <| AddAluOpcode2
+    let IdxIndStage4 () = ReadMemory aluTemp <| SetLowEa
+    let IdxIndStage5 () = ReadMemory (aluTemp + 1) <| SetHighEa
 
-        let AbsIdxStage3 value =
-            ReadMemoryPcIncrement <| (fun mem ->
-                opcode3 <- mem
-                aluTemp <- opcode2 + value
-                ea <- (opcode3 <<< 8) + (aluTemp &&& 0xFF))
+    let IdxIndReadStage6 = ReadMemory ea
+    let IdxIndReadStage6Lda () = IdxIndReadStage6 <| Lda
+    let IdxIndReadStage6Ora () = IdxIndReadStage6 <| Ora
+    let IdxIndReadStage6Lax () = IdxIndReadStage6 <| Lax
+    let IdxIndReadStage6Cmp () = IdxIndReadStage6 <| CmpA
+    let IdxIndReadStage6Adc () = IdxIndReadStage6 <| Adc
+    let IdxIndReadStage6And () = IdxIndReadStage6 <| And
+    let IdxIndReadStage6Eor () = IdxIndReadStage6 <| Eor
+    let IdxIndReadStage6Sbc () = IdxIndReadStage6 <| Sbc
 
-        let AbsIdxStage3X () = AbsIdxStage3 x
-        let AbsIdxStage3Y () = AbsIdxStage3 y
+    let IdxIndWriteStage6 value = WriteMemory ea value <| ignore
+    let IdxIndWriteStage6Sta () = IdxIndWriteStage6 <| a
+    let IdxIndWriteStage6Sax () = IdxIndWriteStage6 <| (a &&& x)
 
-        let AbsIdxReadStage4 () =
-            IfReady <| (fun _ ->
-                if (aluTemp &&& 0x100) = 0 then
-                    mi <- mi + 1
-                    ExecuteOneRetry()
-                else
-                    aluTemp <- ReadMemoryInternal ea
-                    ea <- (ea + 0x100) &&& 0xFFFF)
-        
-        let AbsIdxStage4 () =
-            ReadMemory ea <| fun mem ->
-                if (aluTemp &&& 0x100) <> 0 then
-                    ea <- ea + 0x100
-                aluTemp <- mem
+    let IdxIndRmwStage6 () = ReadMemory ea <| SetAlu
 
-        let AbsIdxWriteStage5 value =
-            WriteMemory ea value <| ignore
+    let IdxIndRmwStage7 = WriteMemory ea aluTemp
+    let IdxIndRmwStage7Slo () = IdxIndRmwStage7 <| Slo
+    let IdxIndRmwStage7Sre () = IdxIndRmwStage7 <| Sre
+    let IdxIndRmwStage7Rra () = IdxIndRmwStage7 <| Rra
+    let IdxIndRmwStage7Isc () = IdxIndRmwStage7 <| Isc
+    let IdxIndRmwStage7Dcp () = IdxIndRmwStage7 <| Dcp
+    let IdxIndRmwStage7Rla () = IdxIndRmwStage7 <| Rla
 
-        let AbsIdxWriteStage5Sh register =
-            aluTemp <- register &&& (ea >>> 8)
-            ea <- (ea &&& 0xFF) ||| (aluTemp <<< 8)
-            AbsIdxWriteStage5 aluTemp
+    let IdxIndRmwStage8 () = WriteMemory ea aluTemp <| ignore
 
-        let AbsIdxWriteStage5Sta () = AbsIdxWriteStage5 a
-        let AbsIdxWriteStage5Shy () = AbsIdxWriteStage5Sh y
-        let AbsIdxWriteStage5Shx () = AbsIdxWriteStage5Sh x
+    let PushP () =
+        b <- true
+        PushDiscard <| GetP()
 
-        let AbsIdxWriteStage5Tas () =
-            s <- a &&& x
-            AbsIdxWriteStage5 (s &&& (ea >>> 8))
+    let PushA () = PushDiscard a
 
-        let AbsIdxRmwStage5 () = ReadMemory ea <| SetAlu
-        let AbsIdxRmwStage7 () = WriteMemory ea aluTemp <| ignore
-
-        let AbsIdxRmwStage6 = WriteMemory ea aluTemp
-        let AbsIdxRmwStage6Dec () = AbsIdxRmwStage6 <| Dec
-        let AbsIdxRmwStage6Dcp () = AbsIdxRmwStage6 <| Dcp
-        let AbsIdxRmwStage6Isc () = AbsIdxRmwStage6 <| Isc
-        let AbsIdxRmwStage6Inc () = AbsIdxRmwStage6 <| Inc
-        let AbsIdxRmwStage6Rol () = AbsIdxRmwStage6 <| Rol
-        let AbsIdxRmwStage6Lsr () = AbsIdxRmwStage6 <| Lsr
-        let AbsIdxRmwStage6Slo () = AbsIdxRmwStage6 <| Slo
-        let AbsIdxRmwStage6Sre () = AbsIdxRmwStage6 <| Sre
-        let AbsIdxRmwStage6Rra () = AbsIdxRmwStage6 <| Rra
-        let AbsIdxRmwStage6Rla () = AbsIdxRmwStage6 <| Rla
-        let AbsIdxRmwStage6Asl () = AbsIdxRmwStage6 <| Asl
-        let AbsIdxRmwStage6Ror () = AbsIdxRmwStage6 <| Ror
-
-        let AbsIdxReadStage5 = ReadMemory ea
-        let AbsIdxReadStage5Lda () = AbsIdxReadStage5 <| Lda
-        let AbsIdxReadStage5Ldx () = AbsIdxReadStage5 <| Ldx
-        let AbsIdxReadStage5Lax () = AbsIdxReadStage5 <| Lax
-        let AbsIdxReadStage5Ldy () = AbsIdxReadStage5 <| Ldy
-        let AbsIdxReadStage5Ora () = AbsIdxReadStage5 <| Ora
-        let AbsIdxReadStage5Nop () = AbsIdxReadStage5 <| ignore
-        let AbsIdxReadStage5Cmp () = AbsIdxReadStage5 <| CmpA
-        let AbsIdxReadStage5Sbc () = AbsIdxReadStage5 <| Sbc
-        let AbsIdxReadStage5Adc () = AbsIdxReadStage5 <| Adc
-        let AbsIdxReadStage5Eor () = AbsIdxReadStage5 <| Eor
-        let AbsIdxReadStage5And () = AbsIdxReadStage5 <| And
-        let AbsIdxReadStage5Las () = AbsIdxReadStage5 <| fun mem ->
-            s <- mem &&& s
-            x <- s
-            a <- s
-            NZ a
-
-        let AbsIndJmpStage4 () =
-            IfReady <| fun _ ->
-                ea <- (opcode3 <<< 8) + opcode2
-                aluTemp <- ReadMemoryInternal ea
-
-        let AbsIndJmpStage5 () =
-            IfReady <| fun _ ->
-                ea <- (opcode3 <<< 8) + ((opcode2 + 1) &&& 0xFF)
-                pc <- aluTemp ||| (ReadMemoryInternal(ea) <<< 8)
-
-        let AbsRmwStage4 () =
-            IfReady <| fun _ ->
-                ea <- (opcode3 <<< 8) + opcode2
-                aluTemp <- ReadMemoryInternal ea
-
-        let AbsRmwStage5 = WriteMemory ea aluTemp
-        let AbsRmwStage5Inc () = AbsRmwStage5 <| Inc
-        let AbsRmwStage5Dec () = AbsRmwStage5 <| Dec
-        let AbsRmwStage5Dcp () = AbsRmwStage5 <| Dcp
-        let AbsRmwStage5Isc () = AbsRmwStage5 <| Isc
-        let AbsRmwStage5Asl () = AbsRmwStage5 <| Asl
-        let AbsRmwStage5Ror () = AbsRmwStage5 <| Ror
-        let AbsRmwStage5Slo () = AbsRmwStage5 <| Slo
-        let AbsRmwStage5Rla () = AbsRmwStage5 <| Rla
-        let AbsRmwStage5Sre () = AbsRmwStage5 <| Sre
-        let AbsRmwStage5Rra () = AbsRmwStage5 <| Rra
-        let AbsRmwStage5Rol () = AbsRmwStage5 <| Rol
-        let AbsRmwStage5Lsr () = AbsRmwStage5 <| Lsr
-
-        let AbsRmwStage6 () = WriteMemory ea aluTemp <| ignore
-
-        let EndISpecial () =
-            opcode <- vopFetch1
-            mi <- 0
-            ExecuteOneRetry()
-            rdy
-
-        let EndSuppressInterrupt () =
-            opcode <- vopFetch1NoInterrupt
-            mi <- 0
-            ExecuteOneRetry()
-            rdy
-
-        let End () =
-            opcode <- vopFetch1
-            mi <- 0
+    let PullPNoInc () =
+        ReadMemoryS <| fun mem ->
+            myIFlag <- i
+            SetP mem
             iFlagPending <- i
-            ExecuteOneRetry()
-            rdy
+            i <- myIFlag
 
-        let EndBranchSpecial = End
+    let PullANoInc () = ReadMemoryS <| fun mem -> a <- mem
 
-        let Jam () = true
+    let Imp operation = FetchDummy <| operation
+    let ImpAslA () = Imp <| AslA
+    let ImpRolA () = Imp <| RolA
+    let ImpRorA () = Imp <| RorA
+    let ImpLsrA () = Imp <| LsrA
+
+    let JmpAbs () = ReadMemory pc <| SetPcJump
+    let IncPc () = FetchDummy <| fun _ -> pc <- (pc + 1) &&& 0xFFFF
+
+    let ZpRmwStage3 () = ReadMemory opcode2 <| SetAlu
+    let ZpRmwStage5 () = WriteMemory opcode2 aluTemp <| ignore
+    let ZpRmw operation = WriteMemory opcode2 aluTemp <| operation
+
+    let ZpRmwInc () = ZpRmw Inc
+    let ZpRmwDec () = ZpRmw Dec
+    let ZpRmwAsl () = ZpRmw Asl
+    let ZpRmwSre () = ZpRmw Sre
+    let ZpRmwRra () = ZpRmw Rra
+    let ZpRmwDcp () = ZpRmw Dcp
+    let ZpRmwLsr () = ZpRmw Lsr
+    let ZpRmwRor () = ZpRmw Ror
+    let ZpRmwRol () = ZpRmw Rol
+    let ZpRmwSlo () = ZpRmw Slo
+    let ZpRmwIsc () = ZpRmw Isc
+    let ZpRmwRla () = ZpRmw Rla
+
+    let AbsIdxStage3 value =
+        ReadMemoryPcIncrement <| (fun mem ->
+            opcode3 <- mem
+            aluTemp <- opcode2 + value
+            ea <- (opcode3 <<< 8) + (aluTemp &&& 0xFF))
+
+    let AbsIdxStage3X () = AbsIdxStage3 x
+    let AbsIdxStage3Y () = AbsIdxStage3 y
+
+    let AbsIdxReadStage4 () =
+        IfReady <| (fun _ ->
+            if (aluTemp &&& 0x100) = 0 then
+                mi <- mi + 1
+                restart <- true
+            else
+                aluTemp <- ReadMemoryInternal ea
+                ea <- (ea + 0x100) &&& 0xFFFF)
+        
+    let AbsIdxStage4 () =
+        ReadMemory ea <| fun mem ->
+            if (aluTemp &&& 0x100) <> 0 then
+                ea <- ea + 0x100
+            aluTemp <- mem
+
+    let AbsIdxWriteStage5 value =
+        WriteMemory ea value <| ignore
+
+    let AbsIdxWriteStage5Sh register =
+        aluTemp <- register &&& (ea >>> 8)
+        ea <- (ea &&& 0xFF) ||| (aluTemp <<< 8)
+        AbsIdxWriteStage5 aluTemp
+
+    let AbsIdxWriteStage5Sta () = AbsIdxWriteStage5 a
+    let AbsIdxWriteStage5Shy () = AbsIdxWriteStage5Sh y
+    let AbsIdxWriteStage5Shx () = AbsIdxWriteStage5Sh x
+
+    let AbsIdxWriteStage5Tas () =
+        s <- a &&& x
+        AbsIdxWriteStage5 (s &&& (ea >>> 8))
+
+    let AbsIdxRmwStage5 () = ReadMemory ea <| SetAlu
+    let AbsIdxRmwStage7 () = WriteMemory ea aluTemp <| ignore
+
+    let AbsIdxRmwStage6 = WriteMemory ea aluTemp
+    let AbsIdxRmwStage6Dec () = AbsIdxRmwStage6 <| Dec
+    let AbsIdxRmwStage6Dcp () = AbsIdxRmwStage6 <| Dcp
+    let AbsIdxRmwStage6Isc () = AbsIdxRmwStage6 <| Isc
+    let AbsIdxRmwStage6Inc () = AbsIdxRmwStage6 <| Inc
+    let AbsIdxRmwStage6Rol () = AbsIdxRmwStage6 <| Rol
+    let AbsIdxRmwStage6Lsr () = AbsIdxRmwStage6 <| Lsr
+    let AbsIdxRmwStage6Slo () = AbsIdxRmwStage6 <| Slo
+    let AbsIdxRmwStage6Sre () = AbsIdxRmwStage6 <| Sre
+    let AbsIdxRmwStage6Rra () = AbsIdxRmwStage6 <| Rra
+    let AbsIdxRmwStage6Rla () = AbsIdxRmwStage6 <| Rla
+    let AbsIdxRmwStage6Asl () = AbsIdxRmwStage6 <| Asl
+    let AbsIdxRmwStage6Ror () = AbsIdxRmwStage6 <| Ror
+
+    let AbsIdxReadStage5 = ReadMemory ea
+    let AbsIdxReadStage5Lda () = AbsIdxReadStage5 <| Lda
+    let AbsIdxReadStage5Ldx () = AbsIdxReadStage5 <| Ldx
+    let AbsIdxReadStage5Lax () = AbsIdxReadStage5 <| Lax
+    let AbsIdxReadStage5Ldy () = AbsIdxReadStage5 <| Ldy
+    let AbsIdxReadStage5Ora () = AbsIdxReadStage5 <| Ora
+    let AbsIdxReadStage5Nop () = AbsIdxReadStage5 <| ignore
+    let AbsIdxReadStage5Cmp () = AbsIdxReadStage5 <| CmpA
+    let AbsIdxReadStage5Sbc () = AbsIdxReadStage5 <| Sbc
+    let AbsIdxReadStage5Adc () = AbsIdxReadStage5 <| Adc
+    let AbsIdxReadStage5Eor () = AbsIdxReadStage5 <| Eor
+    let AbsIdxReadStage5And () = AbsIdxReadStage5 <| And
+    let AbsIdxReadStage5Las () = AbsIdxReadStage5 <| fun mem ->
+        s <- mem &&& s
+        x <- s
+        a <- s
+        NZ a
+
+    let AbsIndJmpStage4 () =
+        IfReady <| fun _ ->
+            ea <- (opcode3 <<< 8) + opcode2
+            aluTemp <- ReadMemoryInternal ea
+
+    let AbsIndJmpStage5 () =
+        IfReady <| fun _ ->
+            ea <- (opcode3 <<< 8) + ((opcode2 + 1) &&& 0xFF)
+            pc <- aluTemp ||| (ReadMemoryInternal(ea) <<< 8)
+
+    let AbsRmwStage4 () =
+        IfReady <| fun _ ->
+            ea <- (opcode3 <<< 8) + opcode2
+            aluTemp <- ReadMemoryInternal ea
+
+    let AbsRmwStage5 = WriteMemory ea aluTemp
+    let AbsRmwStage5Inc () = AbsRmwStage5 <| Inc
+    let AbsRmwStage5Dec () = AbsRmwStage5 <| Dec
+    let AbsRmwStage5Dcp () = AbsRmwStage5 <| Dcp
+    let AbsRmwStage5Isc () = AbsRmwStage5 <| Isc
+    let AbsRmwStage5Asl () = AbsRmwStage5 <| Asl
+    let AbsRmwStage5Ror () = AbsRmwStage5 <| Ror
+    let AbsRmwStage5Slo () = AbsRmwStage5 <| Slo
+    let AbsRmwStage5Rla () = AbsRmwStage5 <| Rla
+    let AbsRmwStage5Sre () = AbsRmwStage5 <| Sre
+    let AbsRmwStage5Rra () = AbsRmwStage5 <| Rra
+    let AbsRmwStage5Rol () = AbsRmwStage5 <| Rol
+    let AbsRmwStage5Lsr () = AbsRmwStage5 <| Lsr
+
+    let AbsRmwStage6 () = WriteMemory ea aluTemp <| ignore
+
+    let EndISpecial () =
+        opcode <- vopFetch1
+        mi <- -1
+        restart <- true
+        rdy
+
+    let EndSuppressInterrupt () =
+        opcode <- vopFetch1NoInterrupt
+        mi <- -1
+        restart <- true
+        rdy
+
+    let End () =
+        opcode <- vopFetch1
+        mi <- -1
+        iFlagPending <- i
+        restart <- true
+        rdy
+
+    let EndBranchSpecial = End
+
+    let Jam () = false
+
+    let rec ExecuteOneRetry sync =
 
 
         // ----- Execution -----
 
-
+        
         let code = 
             match microCode.[opcode].[mi] with
                 | Uop.Fetch1 -> Fetch1
@@ -1675,7 +1673,12 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         let executed = code()
         if executed then
             mi <- mi + 1
-        ()
+
+        if not restart then
+            ()
+        else
+            restart <- false
+            ExecuteOneRetry()
 
 
     // ----- Interface -----
@@ -1684,9 +1687,44 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     member this.Clock () =
         rdy <- ready.Rdy()
         ExecuteOneRetry()
+
     member this.ClockMultiple count =
         rdy <- ready.Rdy()
         let mutable remaining = count
         while remaining > 0 do
             ExecuteOneRetry()
             remaining <- remaining - 1
+
+    member this.ClockStep () =
+        rdy <- ready.Rdy()
+        while mi <= 0 do
+            ExecuteOneRetry()
+        while mi > 0 do
+            ExecuteOneRetry()            
+
+    member this.A = a
+    member this.X = x
+    member this.Y = y
+    member this.P = GetP()
+    member this.S = s
+    member this.PC = pc
+    member this.N = n
+    member this.V = v
+    member this.B = b
+    member this.I = i
+    member this.Z = z
+    member this.C = c
+    member this.D = d
+
+    member this.SetA value = a <- value &&& 0xFF
+    member this.SetX value = x <- value &&& 0xFF
+    member this.SetY value = y <- value &&& 0xFF
+    member this.SetS value = s <- value &&& 0xFF
+    member this.SetPC value = pc <- value &&& 0xFFFF
+    member this.SetN value = n <- value
+    member this.SetV value = v <- value
+    member this.SetB value = b <- value
+    member this.SetI value = i <- value
+    member this.SetZ value = z <- value
+    member this.SetC value = c <- value
+    member this.SetD value = d <- value; isDecimalMode <- d && config.HasDecimalMode
