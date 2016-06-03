@@ -834,8 +834,8 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         NZ a
 
     let Sbc value =
-        let inline setV input result =
-            v <- ((a ^^^ input) &&& 0x80) &&& ((a ^^^ result) &&& 0x80) <> 0
+        let inline setV sum operand =
+            v <- (a ^^^ sum) &&& (a ^^^ operand) &&& 0x80 <> 0
         aluTemp <-
             let binaryResult = a - value - (if c then 0 else 1)
             if isDecimalMode then
@@ -848,35 +848,36 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
                 let result = (if (adjustedSub &&& 0x100) <> 0 then (adjustedSub - 0x060) else adjustedSub)
                 z <- (binaryResult &&& 0xFF) = 0
                 n <- (binaryResult &&& 0x80) <> 0
-                c <- binaryResult < 0x100
-                setV value binaryResult
-                result
+                c <- binaryResult >= 0
+                setV binaryResult value
+                result &&& 0xFF
             else
                 NZ binaryResult
-                c <- binaryResult > 0xFF
-                setV value binaryResult
-                binaryResult
+                c <- binaryResult >= 0
+                setV binaryResult value
+                binaryResult &&& 0xFF
         a <- aluTemp
 
     let Adc value =
-        let inline setV input result =
-            v <- (((a ^^^ input) &&& 0x80) ^^^ 0x80) &&& ((a ^^^ result) &&& 0x80) <> 0
+        let inline setV sum operand =
+            v <- (a ^^^ sum) &&& (a ^^^ operand) &&& 0x80 = 0
         aluTemp <-
             let binaryResult = value + a + (if c then 1 else 0)
             if isDecimalMode then
                 let initialAdd = (a &&& 0x0F) + (value &&& 0x0F) + (if c then 1 else 0)
                 let adjustedAdd = initialAdd + (if initialAdd > 9 then 6 else 0)
-                let result = (initialAdd &&& 0x0F) + (a &&& 0xF0) + (value &&& 0xF0) + (if adjustedAdd > 0x0F then 0x10 else 0x00)
+                let result = (adjustedAdd &&& 0x0F) + (a &&& 0xF0) + (value &&& 0xF0) + (if adjustedAdd > 0x0F then 0x10 else 0x00)
                 z <- (binaryResult &&& 0xFF) = 0
                 n <- (result &&& 0x80) <> 0
-                c <- (result &&& 0x1FF) > 0x0F0
-                setV value result
-                result
+                setV result value
+                let adjustedResult = result + (if result &&& 0x1F0 > 0x090 then 0x060 else 0x000)
+                c <- (adjustedResult &&& 0xFF0) > 0x0F0
+                adjustedResult &&& 0xFF
             else
                 NZ binaryResult
                 c <- binaryResult > 0xFF
-                setV aluTemp binaryResult
-                binaryResult
+                setV binaryResult value
+                binaryResult &&& 0xFF
         a <- aluTemp
 
     let Slo value =
@@ -1697,10 +1698,11 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
     member this.ClockStep () =
         rdy <- ready.Rdy()
-        while mi <= 0 do
-            ExecuteOneRetry()
-        while mi > 0 do
-            ExecuteOneRetry()            
+        if rdy then
+            while mi <= 0 do
+                ExecuteOneRetry()
+            while mi > 0 do
+                ExecuteOneRetry()            
 
     member this.A = a
     member this.X = x
@@ -1716,6 +1718,8 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     member this.C = c
     member this.D = d
 
+    member this.Sync = mi <= 0
+
     member this.SetA value = a <- value &&& 0xFF
     member this.SetX value = x <- value &&& 0xFF
     member this.SetY value = y <- value &&& 0xFF
@@ -1728,3 +1732,10 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     member this.SetZ value = z <- value
     member this.SetC value = c <- value
     member this.SetD value = d <- value; isDecimalMode <- d && config.HasDecimalMode
+
+    member this.SetOpcode value =
+        opcode <- value
+        branchIrqHack <- false
+        mi <- 0
+        restart <- false
+

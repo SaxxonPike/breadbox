@@ -108,11 +108,13 @@ namespace Breadbox.Test.Vic2
         [TestCase(257)]
         [TestCase(262)]
         [TestCase(263)]
+        [TestCase(311)]
+        [TestCase(312)]
         public void Raster8_Load(int rasterLine)
         {
             // Arrange
             const int register = 0x11;
-            var expectedValue = ((rasterLine%263) & 0x100) != 0;
+            var expectedValue = ((rasterLine % Config.RasterLinesPerFrame) & 0x100) != 0;
             Vic.Clock();
 
             // Act
