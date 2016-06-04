@@ -1154,9 +1154,9 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
     let RelBranchStage3 () =
         FetchDummy <| fun _ ->
-            aluTemp <- (pc &&& 0xFF) + opcode2
+            aluTemp <- (pc &&& 0xFF) + (if opcode2 < 0x80 then opcode2 else opcode2 - 256)
             pc <- (pc &&& 0xFF00) ||| (aluTemp &&& 0xFF)
-            if aluTemp >= 0x100 then
+            if (aluTemp &&& 0xFF00) >= 0x100 then
                 opcode <- vopRelativeStuff2
                 mi <- -1
             else

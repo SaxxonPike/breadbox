@@ -60,6 +60,7 @@
     <Compile Include="Cpu6502\Cpu6502BaseTestFixture.cs" />
     <Compile Include="Cpu6502\Cpu6502InterruptTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502AslTests.cs" />
+    <Compile Include="Cpu6502\Opcode\Cpu6502BranchTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502OpcodeBaseTestFixture.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502SbcTests.cs" />
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessNewNtscTests.cs" />
