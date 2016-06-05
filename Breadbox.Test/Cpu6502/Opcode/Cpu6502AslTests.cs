@@ -16,10 +16,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
         }
 
         [Test]
-        public void Asl([Range(0x0, 0xF, 0x5)] int lowA, [Range(0x0, 0xF, 0x5)] int highA, [Range(0x0, 0xF, 0x5)] int lowOperand, [Range(0x0, 0xF, 0x5)] int highOperand)
+        public void Asl([Range(0x0, 0xF, 0x5)] int lowOperand, [Range(0x0, 0xF, 0x5)] int highOperand)
         {
             // Arrange
-            var a = lowA + (highA << 4);
             var operand = lowOperand + (highOperand << 4);
             var expectedResult = operand << 1;
             var expectedSign = (expectedResult & 0x80) != 0;
@@ -27,7 +26,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var expectedOverflow = Cpu.V;
             var expectedCarry = (expectedResult & 0x100) != 0;
             expectedResult &= 0xFF;
-            Cpu.SetA(a);
             MemoryMock.SetupSequence(m => m.Read(It.IsAny<int>()))
                 .Returns(0x00)
                 .Returns(operand);
@@ -41,7 +39,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
             Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
             Cpu.N.Should().Be(expectedSign, "N must be set correctly");
             Cpu.C.Should().Be(expectedCarry, "C must be set correctly");
-            Cpu.A.Should().Be(a, "A must not be modified");
         }
 
         [Test]

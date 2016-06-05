@@ -21,7 +21,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
         [SetUp]
         public void SetupOpcode()
         {
-            Cpu.SetOpcode(_opcode);
+            if (_opcode >= 0)
+                Cpu.SetOpcode(_opcode);
         }
     }
 }

@@ -56,6 +56,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Cpu6502\Opcode\Cpu6502AdcTests.cs" />
+    <Compile Include="Cpu6502\Opcode\Cpu6502DecTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502AndTests.cs" />
     <Compile Include="Cpu6502\Cpu6502BaseTestFixture.cs" />
     <Compile Include="Cpu6502\Cpu6502InterruptTests.cs" />

@@ -10,7 +10,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 {
     public class Cpu6502CompareTests : Cpu6502OpcodeBaseTestFixture
     {
-        public Cpu6502CompareTests() : base(0xC9)
+        public Cpu6502CompareTests() : base(-1)
         {
         }
 
@@ -32,6 +32,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var a = lowA + (highA << 4);
             var data = lowData + (highData << 4);
             Cpu.SetA(a);
+            Cpu.SetOpcode(0xC9);
             MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(data);
 
             // Act
