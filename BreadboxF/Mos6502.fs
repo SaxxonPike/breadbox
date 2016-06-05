@@ -958,8 +958,8 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
     let Rol value =
         let oldC = c
-        c <- (aluTemp &&& 0x80) <> 0
-        aluTemp <- ((a <<< 1) &&& 0xFF) ||| (if oldC then 0x01 else 0x00)
+        c <- (value &&& 0x80) <> 0
+        aluTemp <- ((value <<< 1) &&& 0xFF) ||| (if oldC then 0x01 else 0x00)
         NZ aluTemp
 
     let RolA () =
@@ -968,8 +968,8 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
     let Ror value =
         let oldC = c
-        c <- (aluTemp &&& 0x01) <> 0
-        aluTemp <- (a >>> 1) ||| (if oldC then 0x80 else 0x00)
+        c <- (value &&& 0x01) <> 0
+        aluTemp <- (value >>> 1) ||| (if oldC then 0x80 else 0x00)
         NZ aluTemp
 
     let RorA () =
