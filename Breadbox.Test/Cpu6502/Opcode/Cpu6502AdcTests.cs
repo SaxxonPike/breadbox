@@ -43,7 +43,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
         }
 
         [Test]
-        [TestCase(0xF, 0x0, 0xB, 0x0, 0)]
         public void AdcDecimal([Range(0x0, 0xF, 0x5)] int lowA, [Range(0x0, 0xF, 0x5)] int highA, [Range(0x0, 0xF, 0x5)] int lowOperand, [Range(0x0, 0xF, 0x5)] int highOperand, [Range(0, 1)] int c)
         {
             // Arrange
