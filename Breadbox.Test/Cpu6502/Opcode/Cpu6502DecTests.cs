@@ -8,12 +8,8 @@ using NUnit.Framework;
 
 namespace Breadbox.Test.Cpu6502.Opcode
 {
-    public class Cpu6502DecTests : Cpu6502OpcodeBaseTestFixture
+    public class Cpu6502DecTests : Cpu6502ExecutionBaseTestFixture
     {
-        public Cpu6502DecTests() : base(-1)
-        {
-        }
-
         [Test]
         public void Dec([Range(0x0, 0xF, 0x5)] int lowOperand, [Range(0x0, 0xF, 0x5)] int highOperand)
         {

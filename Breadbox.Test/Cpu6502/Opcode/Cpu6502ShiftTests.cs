@@ -9,12 +9,8 @@ using NUnit.Framework;
 namespace Breadbox.Test.Cpu6502.Opcode
 {
     [TestFixture]
-    public class Cpu6502ShiftTests : Cpu6502OpcodeBaseTestFixture
+    public class Cpu6502ShiftTests : Cpu6502ExecutionBaseTestFixture
     {
-        public Cpu6502ShiftTests() : base(-1)
-        {
-        }
-
         [Test]
         public void Asl([Range(0x0, 0xF, 0x5)] int lowOperand, [Range(0x0, 0xF, 0x5)] int highOperand)
         {
@@ -175,5 +171,59 @@ namespace Breadbox.Test.Cpu6502.Opcode
             Cpu.A.Should().Be(expectedResult, "A must be set correctly");
         }
 
+        [Test]
+        public void Ror([Range(0x0, 0xF, 0x5)] int lowOperand, [Range(0x0, 0xF, 0x5)] int highOperand, [Range(0, 1)] int carry)
+        {
+            // Arrange
+            var operand = lowOperand + (highOperand << 4);
+            var expectedResult = (operand >> 1) | (carry != 0 ? 0x80 : 0x00);
+            var expectedSign = (expectedResult & 0x80) != 0;
+            var expectedZero = (expectedResult & 0xFF) == 0;
+            var expectedOverflow = Cpu.V;
+            var expectedCarry = (operand & 0x01) != 0;
+            MemoryMock.SetupSequence(m => m.Read(It.IsAny<int>()))
+                .Returns(0x00)
+                .Returns(operand);
+            Cpu.SetOpcode(0x66);
+            Cpu.SetC(carry != 0);
+            expectedResult &= 0xFF;
+
+            // Act
+            Cpu.ClockStep();
+            Console.WriteLine("ROR {0:x2} should = {1:x2} with Carry {2}", operand, expectedResult, expectedCarry);
+
+            // Assert
+            Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
+            Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
+            Cpu.N.Should().Be(expectedSign, "N must be set correctly");
+            Cpu.C.Should().Be(expectedCarry, "C must be set correctly");
+        }
+
+        [Test]
+        public void RorA([Range(0x0, 0xF, 0x5)] int lowA, [Range(0x0, 0xF, 0x5)] int highA, [Range(0, 1)] int carry)
+        {
+            // Arrange
+            var a = lowA + (highA << 4);
+            var expectedResult = (a >> 1) | (carry != 0 ? 0x80 : 0x00);
+            var expectedSign = (expectedResult & 0x80) != 0;
+            var expectedZero = (expectedResult & 0xFF) == 0;
+            var expectedOverflow = Cpu.V;
+            var expectedCarry = (a & 0x01) != 0;
+            expectedResult &= 0xFF;
+            Cpu.SetA(a);
+            Cpu.SetOpcode(0x6A);
+            Cpu.SetC(carry != 0);
+
+            // Act
+            Cpu.ClockStep();
+            Console.WriteLine("ROR A [{0:x2}] should = {1:x2} with Carry {2}", a, expectedResult, expectedCarry);
+
+            // Assert
+            Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
+            Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
+            Cpu.N.Should().Be(expectedSign, "N must be set correctly");
+            Cpu.C.Should().Be(expectedCarry, "C must be set correctly");
+            Cpu.A.Should().Be(expectedResult, "A must be set correctly");
+        }
     }
 }

@@ -313,11 +313,11 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             [| Uop.ImpSec; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5And; Uop.End |];
             [| Uop.FetchDummy; Uop.End |];
-            [| Uop.Fetch2; Uop.AbsIdxStage3Y;  Uop.AbsIdxStage4; Uop.AbsIdxRmwStage5; Uop.AbsIdxRmwStage6Rla; Uop.AbsIdxRmwStage7; Uop.End |];
+            [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxStage4; Uop.AbsIdxRmwStage5; Uop.AbsIdxRmwStage6Rla; Uop.AbsIdxRmwStage7; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Nop; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5And; Uop.End |];
-            [| Uop.Fetch2; Uop.AbsIdxStage3X;  Uop.AbsIdxStage4; Uop.AbsIdxRmwStage5; Uop.AbsIdxRmwStage6Rol; Uop.AbsIdxRmwStage7; Uop.End |];
-            [| Uop.Fetch2; Uop.AbsIdxStage3X;  Uop.AbsIdxStage4; Uop.AbsIdxRmwStage5; Uop.AbsIdxRmwStage6Rla; Uop.AbsIdxRmwStage7; Uop.End |];
+            [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxStage4; Uop.AbsIdxRmwStage5; Uop.AbsIdxRmwStage6Rol; Uop.AbsIdxRmwStage7; Uop.End |];
+            [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxStage4; Uop.AbsIdxRmwStage5; Uop.AbsIdxRmwStage6Rla; Uop.AbsIdxRmwStage7; Uop.End |];
 
             // 40
             [| Uop.FetchDummy; Uop.IncS; Uop.PullP; Uop.PullPcl; Uop.PullPchNoInc; Uop.End |];
@@ -433,11 +433,11 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             [| Uop.ImpTya; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Sta; Uop.End |];
             [| Uop.ImpTxs; Uop.End |];
-            [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Tas; Uop.End |];
+            [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Tas; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Shy; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Sta; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Shx; Uop.End |];
-            [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Shx; Uop.End |];
+            [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxStage4; Uop.AbsIdxWriteStage5Tas; Uop.End |];
 
             // A0
             [| Uop.ImmLdy; Uop.End |];
@@ -473,7 +473,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             [| Uop.ImpClv; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Lda; Uop.End |];
             [| Uop.ImpTsx; Uop.End |];
-            [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Las; Uop.End |];
+            [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Las; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Ldy; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3X; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Lda; Uop.End |];
             [| Uop.Fetch2; Uop.AbsIdxStage3Y; Uop.AbsIdxReadStage4; Uop.AbsIdxReadStage5Ldx; Uop.End |];
@@ -572,7 +572,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 105 (VOP_IRQ)
             [| Uop.FetchDummy; Uop.FetchDummy; Uop.PushPch; Uop.PushPcl; Uop.PushPIrq; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
             // 106 (VOP_RESET)
-            [| Uop.FetchDummy; Uop.FetchDummy; Uop.PushDummy; Uop.PushDummy; Uop.PushPReset; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
+            [| Uop.FetchDummy; Uop.FetchDummy; Uop.FetchDummy; Uop.PushDummy; Uop.PushDummy; Uop.PushPReset; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
             // 107 (VOP_Fetch1_NoInterrupt)
             [| Uop.Fetch1Real |];
         |]
@@ -612,15 +612,13 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let mutable aluTemp = 0
     let mutable mi = 0
     let mutable myIFlag = false
-    let mutable iFlagPending = false
+    let mutable iFlagPending = true
     let mutable rdyFreeze = false
     let mutable interruptPending = false
     let mutable branchIrqHack = false
     let mutable irq = false
     let mutable nmi = false
     let mutable rdy = false
-    let mutable value8 = 0
-    let mutable value16 = 0
 
     let mutable pc = 0
     let mutable a = 0
@@ -634,9 +632,27 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let mutable v = false
     let mutable b = false
     let mutable d = false
-    let mutable i = false
+    let mutable i = true
     let mutable z = false
     let mutable c = false
+
+    let SoftReset () =
+        i <- true
+        iFlagPending <- true
+        mi <- 0
+        opcode <- vopReset
+
+    let HardReset () =
+        a <- 0x00
+        x <- 0x00
+        y <- 0x00
+        n <- false
+        v <- false
+        b <- false
+        d <- false
+        z <- false
+        c <- false        
+        SoftReset()
 
     let GetP () =
         0x20 |||
@@ -729,8 +745,6 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         opcode2 <- value
     let SetOpcode3 value =
         opcode3 <- value
-    let AddOpcode2 value =
-        opcode2 <- (opcode2 + value) &&& 0xFF
     let AddAluOpcode2 value =
         aluTemp <- (opcode2 + value) &&& 0xFF
     let SetLowEa value =
@@ -981,7 +995,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
 
     let FetchDiscard address operation = ReadMemory address (fun _ -> operation())
-    let FetchDummy = FetchDiscard pc
+    let FetchDummy operation = FetchDiscard pc <| operation
 
     let Fetch1RealInternal () =
         opcode <- ReadMemoryInternal pc
@@ -1020,6 +1034,9 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let PushPch () = Push (GetPch()) <| ignore
     let PushPcl () = Push (GetPcl()) <| ignore
 
+    let PushDummy () =
+        ReadMemoryS <| fun _ -> s <- (s - 1) &&& 0xFF
+
     let PushPInterrupt newB newEa =
         b <- newB
         Push (GetP()) <| fun _ ->
@@ -1036,10 +1053,13 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         PushPInterrupt false nmiVector
 
     let PushPReset () =
-        PushPInterrupt false resetVector
-
-    let PushDummy () =
-        IfReady <| fun _ -> s <- (s - 1) &&& 0xFF
+        if PushDummy() then
+            b <- false
+            i <- true
+            ea <- resetVector
+            true
+        else
+            false
 
     let FetchPclVector () =
         IfReady <| fun _ ->
@@ -1050,10 +1070,10 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             
     let FetchPchVector () =
         IfReady <| fun _ ->
-            aluTemp <- aluTemp ||| (ReadMemoryInternal(ea) <<< 8)
+            aluTemp <- aluTemp ||| (ReadMemoryInternal(ea + 1) <<< 8)
             pc <- aluTemp
 
-    let Imp = FetchDummy
+    let Imp operation = FetchDummy operation
     let ImpIny () = Imp <| fun _ -> (Inc y; y <- aluTemp)
     let ImpDey () = Imp <| fun _ -> (Dec y; y <- aluTemp)
     let ImpInx () = Imp <| fun _ -> (Inc x; x <- aluTemp)
@@ -1084,11 +1104,11 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let ZpWriteSty () = ZpWrite <| y
     let ZpWriteSax () = ZpWrite <| (x &&& a)
 
-    let IndIdxStage3 () = ReadMemory opcode2 SetLowEa
+    let IndIdxStage3 () = ReadMemory opcode2 <| SetLowEa
     let IndIdxStage4 () =
         IfReady <| fun _ ->
             aluTemp <- ea + y
-            ea <- ReadMemoryInternal <| (((opcode2 + 1) &&& 0xFF) <<< 8) ||| (aluTemp &&& 0xFF)
+            ea <- ((ReadMemoryInternal <| (opcode2 + 1) &&& 0xFF) <<< 8) ||| (aluTemp &&& 0xFF)
 
     let IndIdxWriteStage5 () =
         IfReady <| fun _ ->
@@ -1097,8 +1117,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
     let IndIdxReadStage5 () =
         IfReady <| fun _ ->
-            if aluTemp >= 0x100 then
-                mi <- mi + 1
+            if aluTemp < 0x100 then
                 restart <- true
             else
                 ReadMemoryInternal ea |> ignore
@@ -1190,7 +1209,10 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let AbsReadCpx () = AbsRead <| CmpX
     let AbsReadSbc () = AbsRead <| Sbc
 
-    let ZpIdxStage3 value = ReadMemory opcode2 <| AddOpcode2         
+    let ZpIdxStage3 value =
+        ReadMemory opcode2 <|
+            fun _ ->
+                opcode2 <- (opcode2 + value) &&& 0xFF
     let ZpIdxStage3X () = ZpIdxStage3 <| x
     let ZpIdxStage3Y () = ZpIdxStage3 <| y
 
@@ -1236,7 +1258,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let IdxIndStage4 () = ReadMemory aluTemp <| SetLowEa
     let IdxIndStage5 () = ReadMemory (aluTemp + 1) <| SetHighEa
 
-    let IdxIndReadStage6 = ReadMemory ea
+    let IdxIndReadStage6 operation = ReadMemory ea operation
     let IdxIndReadStage6Lda () = IdxIndReadStage6 <| Lda
     let IdxIndReadStage6Ora () = IdxIndReadStage6 <| Ora
     let IdxIndReadStage6Lax () = IdxIndReadStage6 <| Lax
@@ -1252,7 +1274,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
     let IdxIndRmwStage6 () = ReadMemory ea <| SetAlu
 
-    let IdxIndRmwStage7 = WriteMemory ea aluTemp
+    let IdxIndRmwStage7 operation = WriteMemory ea aluTemp operation
     let IdxIndRmwStage7Slo () = IdxIndRmwStage7 <| Slo
     let IdxIndRmwStage7Sre () = IdxIndRmwStage7 <| Sre
     let IdxIndRmwStage7Rra () = IdxIndRmwStage7 <| Rra
@@ -1314,8 +1336,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
     let AbsIdxReadStage4 () =
         IfReady <| (fun _ ->
-            if (aluTemp &&& 0x100) = 0 then
-                mi <- mi + 1
+            if aluTemp < 0x100 then
                 restart <- true
             else
                 aluTemp <- ReadMemoryInternal ea
@@ -1323,7 +1344,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         
     let AbsIdxStage4 () =
         ReadMemory ea <| fun mem ->
-            if (aluTemp &&& 0x100) <> 0 then
+            if aluTemp >= 0x100 then
                 ea <- ea + 0x100
             aluTemp <- mem
 
@@ -1346,7 +1367,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let AbsIdxRmwStage5 () = ReadMemory ea <| SetAlu
     let AbsIdxRmwStage7 () = WriteMemory ea aluTemp <| ignore
 
-    let AbsIdxRmwStage6 = WriteMemory ea aluTemp
+    let AbsIdxRmwStage6 operation = WriteMemory ea aluTemp <| operation
     let AbsIdxRmwStage6Dec () = AbsIdxRmwStage6 <| Dec
     let AbsIdxRmwStage6Dcp () = AbsIdxRmwStage6 <| Dcp
     let AbsIdxRmwStage6Isc () = AbsIdxRmwStage6 <| Isc
@@ -1360,7 +1381,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let AbsIdxRmwStage6Asl () = AbsIdxRmwStage6 <| Asl
     let AbsIdxRmwStage6Ror () = AbsIdxRmwStage6 <| Ror
 
-    let AbsIdxReadStage5 = ReadMemory ea
+    let AbsIdxReadStage5 operation = ReadMemory ea <| operation
     let AbsIdxReadStage5Lda () = AbsIdxReadStage5 <| Lda
     let AbsIdxReadStage5Ldx () = AbsIdxReadStage5 <| Ldx
     let AbsIdxReadStage5Lax () = AbsIdxReadStage5 <| Lax
@@ -1393,7 +1414,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             ea <- (opcode3 <<< 8) + opcode2
             aluTemp <- ReadMemoryInternal ea
 
-    let AbsRmwStage5 = WriteMemory ea aluTemp
+    let AbsRmwStage5 operation = WriteMemory ea aluTemp operation
     let AbsRmwStage5Inc () = AbsRmwStage5 <| Inc
     let AbsRmwStage5Dec () = AbsRmwStage5 <| Dec
     let AbsRmwStage5Dcp () = AbsRmwStage5 <| Dcp
@@ -1718,7 +1739,10 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     member this.C = c
     member this.D = d
 
-    member this.Sync = mi <= 0
+    member this.Sync =
+        match microCode.[opcode].[mi] with
+            | Uop.Fetch1 | Uop.Fetch1Real | Uop.End | Uop.EndBranchSpecial | Uop.EndISpecial | Uop.EndSuppressInterrupt -> true
+            | _ -> false
 
     member this.SetA value = a <- value &&& 0xFF
     member this.SetX value = x <- value &&& 0xFF
@@ -1728,7 +1752,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     member this.SetN value = n <- value
     member this.SetV value = v <- value
     member this.SetB value = b <- value
-    member this.SetI value = i <- value
+    member this.SetI value = i <- value; iFlagPending <- value
     member this.SetZ value = z <- value
     member this.SetC value = c <- value
     member this.SetD value = d <- value; isDecimalMode <- d && config.HasDecimalMode
@@ -1738,4 +1762,8 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         branchIrqHack <- false
         mi <- 0
         restart <- false
+
+    member this.ForceOpcodeSync () =
+        this.SetOpcode vopFetch1
+        
 

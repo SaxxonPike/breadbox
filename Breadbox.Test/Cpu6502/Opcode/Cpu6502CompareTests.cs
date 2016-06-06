@@ -8,12 +8,8 @@ using NUnit.Framework;
 
 namespace Breadbox.Test.Cpu6502.Opcode
 {
-    public class Cpu6502CompareTests : Cpu6502OpcodeBaseTestFixture
+    public class Cpu6502CompareTests : Cpu6502ExecutionBaseTestFixture
     {
-        public Cpu6502CompareTests() : base(-1)
-        {
-        }
-
         private void CompareFlags(int register, int data)
         {
             var compare = register - data;

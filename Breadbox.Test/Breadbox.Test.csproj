@@ -55,17 +55,26 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cpu6502\Integration\Cpu6502Commodore64KernalTest.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502AdcTests.cs" />
+    <Compile Include="Cpu6502\Opcode\Cpu6502AddressingTests.cs" />
+    <Compile Include="Cpu6502\Opcode\Cpu6502BitwiseTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502DecTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502AndTests.cs" />
     <Compile Include="Cpu6502\Cpu6502BaseTestFixture.cs" />
     <Compile Include="Cpu6502\Cpu6502InterruptTests.cs" />
+    <Compile Include="Cpu6502\Opcode\Cpu6502ExecutionBaseTestFixture.cs" />
+    <Compile Include="Cpu6502\Opcode\Cpu6502FlagOpcodeTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502ShiftTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502BitTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502BranchTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502CompareTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502OpcodeBaseTestFixture.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502SbcTests.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessNewNtscTests.cs" />
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessOldNtscTests.cs" />
     <Compile Include="Vic2\MemoryAccess\Vic2MemoryAccessPalBTests.cs" />
@@ -91,6 +100,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="Resources\basic.901226-01.bin" />
+    <None Include="Resources\kernal.901227-03.bin" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BreadboxF\Breadbox.fsproj">
@@ -99,6 +110,12 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

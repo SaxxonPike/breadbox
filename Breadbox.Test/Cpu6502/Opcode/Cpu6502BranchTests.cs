@@ -9,14 +9,8 @@ using NUnit.Framework;
 namespace Breadbox.Test.Cpu6502.Opcode
 {
     [TestFixture]
-    public class Cpu6502BranchTests : Cpu6502BaseTestFixture
+    public class Cpu6502BranchTests : Cpu6502ExecutionBaseTestFixture
     {
-        protected override void SetUpMocks()
-        {
-            base.SetUpMocks();
-            MemoryMock = new Mock<IMemory>();
-        }
-
         protected int CalculateBranch(int pc, int offset, bool taken)
         {
             if (taken)
