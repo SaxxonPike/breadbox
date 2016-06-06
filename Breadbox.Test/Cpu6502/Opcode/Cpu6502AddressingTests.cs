@@ -39,11 +39,13 @@ namespace Breadbox.Test.Cpu6502.Opcode
                 switch (access.AccessType)
                 {
                     case AccessType.Read:
+                        Console.WriteLine("Verifying READ at ${0:x4}", address);
                         MemoryMock.Verify(m => m.Read(It.IsIn(address)), Times.Once);
                         MemoryMock.Verify(m => m.Read(It.IsNotIn(address)), Times.Never);
                         MemoryMock.Verify(m => m.Write(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
                         break;
                     case AccessType.Write:
+                        Console.WriteLine("Verifying WRITE at ${0:x4}", address);
                         MemoryMock.Verify(m => m.Write(It.IsIn(address), It.IsAny<int>()), Times.Once);
                         MemoryMock.Verify(m => m.Write(It.IsNotIn(address), It.IsAny<int>()), Times.Never);
                         MemoryMock.Verify(m => m.Read(It.IsAny<int>()), Times.Never);
@@ -116,6 +118,26 @@ namespace Breadbox.Test.Cpu6502.Opcode
                 new AccessEntry(AccessType.Read, address),
                 new AccessEntry(AccessType.Read, address + 1),
                 new AccessEntry(AccessType.Write, zpAddress),
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void ZpRmw([Values(0x06, 0x07, 0x26, 0x27, 0x46, 0x47, 0x66, 0x67, 0xC6, 0xC7, 0xE6, 0xE7)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress)
+        {
+            // Arrange
+            Cpu.SetPC(address);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            var accesses = new[]
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, zpAddress),
+                new AccessEntry(AccessType.Write, zpAddress),
+                new AccessEntry(AccessType.Write, zpAddress)
             };
 
             // Assert
@@ -424,6 +446,169 @@ namespace Breadbox.Test.Cpu6502.Opcode
                 new AccessEntry(AccessType.Read, address),
                 new AccessEntry(AccessType.Read, address + 1),
                 new AccessEntry(AccessType.Read, address + 2),
+                new AccessEntry(AccessType.Read, (absAddress & 0xFF00) | ((absAddress + y) & 0xFF)),
+                new AccessEntry(AccessType.Read, (absAddress + y) & 0xFFFF),
+                new AccessEntry(AccessType.Write, (absAddress + y) & 0xFFFF),
+                new AccessEntry(AccessType.Write, (absAddress + y) & 0xFFFF)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void IzxRead([Values(0x01, 0x21, 0x41, 0x61, 0xA1, 0xA3, 0xC1, 0xE1)] int opcode, [Random(0x0100, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress, [Random(0x0000, 0xFFFF, 1)] int absAddress, [Values(0x00, 0xFF)] int x)
+        {
+            // Arrange
+            address |= 0x80;
+            Cpu.SetPC(address);
+            Cpu.SetX(x);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            MemoryMock.Setup(m => m.Read((zpAddress + x) & 0xFF)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read((zpAddress + x + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+
+            var accesses = new List<AccessEntry>
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, zpAddress),
+                new AccessEntry(AccessType.Read, (zpAddress + x) & 0xFF),
+                new AccessEntry(AccessType.Read, (zpAddress + x + 1) & 0xFF),
+                new AccessEntry(AccessType.Read, absAddress)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void IzxWrite([Values(0x81, 0x83)] int opcode, [Random(0x0100, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress, [Random(0x0100, 0xFFFF, 1)] int absAddress, [Values(0x00, 0xFF)] int x)
+        {
+            // Arrange
+            address |= 0x80;
+            Cpu.SetPC(address);
+            Cpu.SetX(x);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            MemoryMock.Setup(m => m.Read((zpAddress + x) & 0xFF)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read((zpAddress + x + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+
+            var accesses = new List<AccessEntry>
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, zpAddress),
+                new AccessEntry(AccessType.Read, (zpAddress + x) & 0xFF),
+                new AccessEntry(AccessType.Read, (zpAddress + x + 1) & 0xFF),
+                new AccessEntry(AccessType.Write, absAddress)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void IzxRmw([Values(0x03, 0x23, 0x43, 0x63, 0xC3, 0xE3)] int opcode, [Random(0x0100, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress, [Random(0x0000, 0xFFFF, 1)] int absAddress, [Values(0x00, 0xFF)] int x)
+        {
+            // Arrange
+            address |= 0x80;
+            Cpu.SetPC(address);
+            Cpu.SetX(x);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            MemoryMock.Setup(m => m.Read((zpAddress + x) & 0xFF)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read((zpAddress + x + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+
+            var accesses = new List<AccessEntry>
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, zpAddress),
+                new AccessEntry(AccessType.Read, (zpAddress + x) & 0xFF),
+                new AccessEntry(AccessType.Read, (zpAddress + x + 1) & 0xFF),
+                new AccessEntry(AccessType.Read, absAddress),
+                new AccessEntry(AccessType.Write, absAddress),
+                new AccessEntry(AccessType.Write, absAddress)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void IzyRead([Values(0x11, 0x31, 0x51, 0x71, 0xB1, 0xB3, 0xD1, 0xF1)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress, [Random(0x00, 0xFF, 1)] int absAddress, [Values(0x00, 0xFF)] int y)
+        {
+            // Arrange
+            address |= 0x80;
+            Cpu.SetPC(address);
+            Cpu.SetY(y);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            MemoryMock.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+
+            var accesses = new List<AccessEntry>
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, zpAddress),
+                new AccessEntry(AccessType.Read, (zpAddress + 1) & 0xFF),
+                new AccessEntry(AccessType.Read, (absAddress & 0xFF00) | ((absAddress + y) & 0xFF))
+            };
+            if ((absAddress & 0xFF) + y >= 0x100)
+            {
+                accesses.Add(new AccessEntry(AccessType.Read, (absAddress + y) & 0xFFFF));
+            }
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void IzyWrite([Values(0x91)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress, [Random(0x00, 0xFF, 1)] int absAddress, [Values(0x00, 0xFF)] int y)
+        {
+            // Arrange
+            address |= 0x80;
+            Cpu.SetPC(address);
+            Cpu.SetY(y);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            MemoryMock.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+
+            var accesses = new List<AccessEntry>
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, zpAddress),
+                new AccessEntry(AccessType.Read, (zpAddress + 1) & 0xFF),
+                new AccessEntry(AccessType.Read, (absAddress & 0xFF00) | ((absAddress + y) & 0xFF)),
+                new AccessEntry(AccessType.Write, (absAddress + y) & 0xFFFF)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void IzyRmw([Values(0x13, 0x33, 0x53, 0x73, 0xD3, 0xF3)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress, [Random(0x00, 0xFF, 1)] int absAddress, [Values(0x00, 0xFF)] int y)
+        {
+            // Arrange
+            address |= 0x80;
+            Cpu.SetPC(address);
+            Cpu.SetY(y);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            MemoryMock.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+
+            var accesses = new List<AccessEntry>
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, zpAddress),
+                new AccessEntry(AccessType.Read, (zpAddress + 1) & 0xFF),
                 new AccessEntry(AccessType.Read, (absAddress & 0xFF00) | ((absAddress + y) & 0xFF)),
                 new AccessEntry(AccessType.Read, (absAddress + y) & 0xFFFF),
                 new AccessEntry(AccessType.Write, (absAddress + y) & 0xFFFF),

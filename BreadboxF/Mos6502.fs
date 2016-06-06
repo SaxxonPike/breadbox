@@ -745,8 +745,6 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         opcode2 <- value
     let SetOpcode3 value =
         opcode3 <- value
-    let AddAluOpcode2 value =
-        aluTemp <- (opcode2 + value) &&& 0xFF
     let SetLowEa value =
         ea <- value
     let SetHighEa value =
@@ -1125,9 +1123,9 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
     let IndIdxRmwStage5 () =
         IfReady <| fun _ ->
+            ReadMemoryInternal ea |> ignore
             if aluTemp >= 0x100 then
                 ea <- (ea + 0x100) &&& 0xFFFF
-            ReadMemoryInternal ea |> ignore
 
     let IndIdxWriteStage6 value = WriteMemory ea value <| ignore
     let IndIdxWriteStage6Sta () = IndIdxWriteStage6 <| a
@@ -1254,11 +1252,13 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let ImmLdy () = Imm <| Ldy
     let ImmUnsupported () = Imm <| ignore
 
-    let IdxIndStage3 () = ReadMemory opcode2 <| AddAluOpcode2
+    let IdxIndStage3 () =
+        ReadMemory opcode2 <| fun mem ->
+            aluTemp <- (opcode2 + x) &&& 0xFF
     let IdxIndStage4 () = ReadMemory aluTemp <| SetLowEa
     let IdxIndStage5 () = ReadMemory (aluTemp + 1) <| SetHighEa
 
-    let IdxIndReadStage6 operation = ReadMemory ea operation
+    let IdxIndReadStage6 operation = ReadMemory ea <| operation
     let IdxIndReadStage6Lda () = IdxIndReadStage6 <| Lda
     let IdxIndReadStage6Ora () = IdxIndReadStage6 <| Ora
     let IdxIndReadStage6Lax () = IdxIndReadStage6 <| Lax
