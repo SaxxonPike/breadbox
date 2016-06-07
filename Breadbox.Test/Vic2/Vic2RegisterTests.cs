@@ -147,13 +147,16 @@ namespace Breadbox.Test.Vic2
         [TestCase(255)]
         [TestCase(256)]
         [TestCase(257)]
+        [TestCase(261)]
         [TestCase(262)]
         [TestCase(263)]
+        [TestCase(311)]
+        [TestCase(312)]
         public void Raster_Load(int rasterLine)
         {
             // Arrange
             const int register = 0x12;
-            var expectedValue = (rasterLine%263) & 0xFF;
+            var expectedValue = (rasterLine % Config.RasterLinesPerFrame) & 0xFF;
             Vic.Clock();
 
             // Act
