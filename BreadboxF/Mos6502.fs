@@ -647,6 +647,12 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let mutable z = false
     let mutable c = false
 
+    let lxaConstant = config.LxaConstant
+    let hasDecimalMode = config.HasDecimalMode
+    let readRdy = ready.ReadRdy
+    let read = memory.Read
+    let write = memory.Write
+
     let SoftReset () =
         i <- true
         iFlagPending <- true
@@ -698,7 +704,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         NZ y
 
     let ReadMemoryInternal address =
-        memory.Read address
+        read address
 
     let ReadMemory address operation =
         if rdy then
@@ -706,7 +712,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         rdy
 
     let WriteMemory address value operation =
-        memory.Write(address, value)
+        write(address, value)
         value |> operation
         true
 
@@ -851,7 +857,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         a <- aluTemp
 
     let Lxa value =
-        aluTemp <- (a ||| config.LxaConstant) &&& value
+        aluTemp <- (a ||| lxaConstant) &&& value
         a <- aluTemp
         x <- aluTemp
         NZ a
@@ -1104,7 +1110,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let ImpSec () = Imp <| fun _ -> c <- true
     let ImpClc () = Imp <| fun _ -> c <- false
     let ImpClv () = Imp <| fun _ -> v <- false
-    let ImpSed () = Imp <| fun _ -> (d <- true; isDecimalMode <- config.HasDecimalMode)
+    let ImpSed () = Imp <| fun _ -> (d <- true; isDecimalMode <- hasDecimalMode)
     let ImpCld () = Imp <| fun _ -> (d <- false; isDecimalMode <- false)
 
     let AbsWrite value = WriteMemory ((opcode3 <<< 8) ||| opcode2) value <| ignore
@@ -1722,18 +1728,18 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
 
 
     member this.Clock () =
-        rdy <- ready.Rdy()
+        rdy <- readRdy()
         ExecuteOneRetry()
 
     member this.ClockMultiple count =
-        rdy <- ready.Rdy()
+        rdy <- readRdy()
         let mutable remaining = count
         while remaining > 0 do
             ExecuteOneRetry()
             remaining <- remaining - 1
 
     member this.ClockStep () =
-        rdy <- ready.Rdy()
+        rdy <- readRdy()
         if rdy then
             while mi <= 0 do
                 ExecuteOneRetry()
@@ -1770,7 +1776,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     member this.SetI value = i <- value; iFlagPending <- value
     member this.SetZ value = z <- value
     member this.SetC value = c <- value
-    member this.SetD value = d <- value; isDecimalMode <- d && config.HasDecimalMode
+    member this.SetD value = d <- value; isDecimalMode <- d && hasDecimalMode
 
     member this.SetOpcode value =
         opcode <- value

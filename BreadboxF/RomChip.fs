@@ -18,3 +18,7 @@ type RomChip (sizeBits, dataBits) =
         else
             binary.CopyTo(data, 0)
 
+    member this.Read(address) = (this :> IMemory).Read(address)
+    member this.Write(address, value) = (this :> IMemory).Write(address, value)
+    member this.Peek(address) = (this :> IMemory).Peek(address)
+    member this.Poke(address, value) = (this :> IMemory).Poke(address, value)

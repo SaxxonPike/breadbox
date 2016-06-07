@@ -3,55 +3,45 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Breadbox.System;
 using Breadbox.Test.Properties;
+using Moq;
 using NUnit.Framework;
 
 namespace Breadbox.Test.Cpu6502.Integration
 {
     public class Cpu6502Commodore64KernalTest
     {
-        private class MockPla : IMemory
+        private class MockSignals : ILoRamSignal, IHiRamSignal, IGameSignal, IExRomSignal, ICharenSignal, IVicBank
         {
-            private readonly int[] _memory = new int[0x10000];
-            private readonly Random _random = new Random();
-
-            public byte[] Dump()
+            public bool ReadLoRam()
             {
-                return Enumerable.Range(0, 0x10000).Select(Read).Select(b => (byte) (b & 0xFF)).ToArray();
+                return true;
             }
 
-            public int Read(int address)
+            public bool ReadHiRam()
             {
-                switch (address)
-                {
-                    case 0xD012:
-                        return _random.Next(256);
-                    default:
-                        if (address >= 0xD400 && address < 0xD800)
-                            return 0xFF;
-                        if (address >= 0xDC00 && address < 0xE000)
-                            return 0xFF;
-                        if (address >= 0xA000 && address < 0xC000)
-                            return Resources.basic_901226_01[address & 0x1FFF];
-                        return address >= 0xE000
-                            ? Resources.kernal_901227_03[address & 0x1FFF]
-                            : _memory[address];
-                }
+                return true;
             }
 
-            public void Write(int address, int value)
+            public bool ReadGame()
             {
-                _memory[address] = value & 0xFF;
+                return true;
             }
 
-            public int Peek(int address)
+            public bool ReadExRom()
             {
-                return Read(address);
+                return true;
             }
 
-            public void Poke(int address, int value)
+            public bool ReadCharen()
             {
-                Write(address, value);
+                return true;
+            }
+
+            public int ReadVicBank()
+            {
+                return 0x0000;
             }
         }
 
@@ -60,29 +50,55 @@ namespace Breadbox.Test.Cpu6502.Integration
         public void Test1()
         {
             // Arrange
-            var traceEnabled = false;
-            var memory = new MockPla();
-            var memoryTrace = new MemoryTrace(memory,
-                address =>
-                {
-                    if (traceEnabled)
-                        Console.WriteLine("READ  ${0:x4} -> #${1:x2}", address, memory.Peek(address));
-                },
-                (address, value) =>
-                {
-                    if (traceEnabled)
-                        Console.WriteLine("WRITE ${0:x4} <- #${1:x2}", address, value);
-                });
+            var signalMock = new MockSignals();
+            var ioMock = new Mock<IMemory>();
+            var rasterLineRequests = 0;
 
-            var cpu = new Mos6502(new Mos6502Configuration(0xFF, true), memoryTrace, new ReadySignalNull());
+            ioMock.Setup(m => m.Read(It.IsInRange(0xD400, 0xDFFF, Range.Inclusive))).Returns(0xFF);
+            ioMock.Setup(m => m.Read(It.IsIn(0xD012))).Returns(() =>
+            {
+                rasterLineRequests = (rasterLineRequests + 1) & 0xFF;
+                return rasterLineRequests;
+            });
+
+            var ram = new RamChip(16, 8);
+            var color = new RamChip(10, 4);
+            var basic = new RomChip(13, 8);
+            var kernal = new RomChip(13, 8);
+            var chargen = new RomChip(12, 8);
+            var roml = new MemoryNull();
+            var romh = new MemoryNull();
+
+            kernal.Flash(Resources.kernal_901227_03.Select(i => (int)i).ToArray());
+            basic.Flash(Resources.basic_901226_01.Select(i => (int)i).ToArray());
+
+            var traceEnabled = false;
+            var plaConfig = new Commodore64SystemPlaConfiguration(
+                signalMock,
+                signalMock,
+                signalMock,
+                signalMock,
+                signalMock,
+                ram,
+                color,
+                basic,
+                kernal,
+                chargen,
+                roml,
+                romh,
+                ioMock.Object,
+                signalMock
+                );
+            var pla = new Commodore64SystemPla(plaConfig);
+            var bus = pla.SystemBus;
+
+            var cpu = new Mos6502(new Mos6502Configuration(0xFF, true), bus, new ReadySignalNull());
 
             // Act
-            cpu.ClockMultiple(3000000);
-            //traceEnabled = true;
-            //cpu.ClockMultiple(5000);
+            cpu.ClockMultiple(5000000);
 
             // Assert
-            var dump = memory.Dump();
+            var dump = ram.Dump();
             File.WriteAllBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dump.bin"), dump);
         }
     }
