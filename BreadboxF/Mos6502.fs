@@ -231,18 +231,29 @@ type private Uop =
     | EndBranchSpecial
     | EndSuppressInterrupt
     | Jam
+    | JamFFFF
+    | JamFFFE
 
 type Mos6502Configuration(lxaConstant:int, hasDecimalMode:bool) =
     member val LxaConstant = lxaConstant
     member val HasDecimalMode = hasDecimalMode
 
 type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
+    let jamMicrocodes =
+        [|
+            Uop.Fetch2;
+            Uop.JamFFFF;
+            Uop.JamFFFE;
+            Uop.JamFFFE;
+            Uop.Jam;
+        |]
+    
     let microCode =
         [|
             // 00
             [| Uop.Fetch2; Uop.PushPch; Uop.PushPcl; Uop.PushPBrk; Uop.FetchPclVector; Uop.FetchPchVector; Uop.EndSuppressInterrupt |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6Ora; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Slo; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadOra; Uop.End |];
@@ -262,7 +273,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 10
             [| Uop.RelBranchStage2Bpl; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Ora; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Slo; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadOra; Uop.End |];
@@ -282,7 +293,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 20
             [| Uop.Fetch2; Uop.Nop; Uop.PushPch; Uop.PushPcl; Uop.Jsr; Uop.End |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6And; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Rla; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadBit; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadAnd; Uop.End |];
@@ -302,7 +313,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 30
             [| Uop.RelBranchStage2Bmi; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6And; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Rla; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadAnd; Uop.End |];
@@ -322,7 +333,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 40
             [| Uop.FetchDummy; Uop.IncS; Uop.PullP; Uop.PullPcl; Uop.PullPchNoInc; Uop.End |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6Eor; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Sre; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadEor; Uop.End |];
@@ -342,7 +353,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 50
             [| Uop.RelBranchStage2Bvc; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Eor; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Sre; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadEor; Uop.End |];
@@ -362,7 +373,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 60
             [| Uop.FetchDummy; Uop.IncS; Uop.PullPcl; Uop.PullPchNoInc; Uop.IncPc; Uop.End |];
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndReadStage6Adc; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IdxIndStage3; Uop.IdxIndStage4; Uop.IdxIndStage5; Uop.IdxIndRmwStage6; Uop.IdxIndRmwStage7Rra; Uop.IdxIndRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpReadAdc; Uop.End |];
@@ -382,7 +393,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 70
             [| Uop.RelBranchStage2Bvs; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Adc; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Rra; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadAdc; Uop.End |];
@@ -422,7 +433,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // 90
             [| Uop.RelBranchStage2Bcc; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxWriteStage5; Uop.IndIdxWriteStage6Sta; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxWriteStage5; Uop.IndIdxWriteStage6Sha; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpWriteSty; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpWriteSta; Uop.End |];
@@ -462,7 +473,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // B0
             [| Uop.RelBranchStage2Bcs; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Lda; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Lax; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadLdy; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadLda; Uop.End |];
@@ -502,7 +513,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // D0
             [| Uop.RelBranchStage2Bne; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Cmp; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Dcp; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadCmp; Uop.End |];
@@ -542,7 +553,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
             // F0
             [| Uop.RelBranchStage2Beq; Uop.End |];
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxReadStage5; Uop.IndIdxReadStage6Sbc; Uop.End |];
-            [| Uop.Jam |];
+            jamMicrocodes;
             [| Uop.Fetch2; Uop.IndIdxStage3; Uop.IndIdxStage4; Uop.IndIdxRmwStage5; Uop.IndIdxRmwStage6; Uop.IndIdxRmwStage7Isc; Uop.IndIdxRmwStage8; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadNop; Uop.End |];
             [| Uop.Fetch2; Uop.ZpIdxStage3X; Uop.ZpReadSbc; Uop.End |];
@@ -988,6 +999,12 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         Ror a
         a <- aluTemp
 
+    let Las value =
+        s <- value &&& s
+        x <- s
+        a <- s
+        NZ a
+
 
     // ----- uOPS -----
 
@@ -1184,7 +1201,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         FetchDummy <| fun _ ->
             pc <- (pc + (if aluTemp < 0 then -256 else 256)) &&& 0xFFFF
 
-    let IncS () = FetchDummy <| fun _ -> s <- (s + 1) &&& 0xFF
+    let IncS () = ReadMemoryS <| fun _ -> s <- (s + 1) &&& 0xFF
     let Jsr () = ReadMemory pc <| SetPcJump
     let PullP () = Pull <| SetP
     let PullPcl () = Pull <| SetPcl
@@ -1393,11 +1410,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let AbsIdxReadStage5Adc () = AbsIdxReadStage5 <| Adc
     let AbsIdxReadStage5Eor () = AbsIdxReadStage5 <| Eor
     let AbsIdxReadStage5And () = AbsIdxReadStage5 <| And
-    let AbsIdxReadStage5Las () = AbsIdxReadStage5 <| fun mem ->
-        s <- mem &&& s
-        x <- s
-        a <- s
-        NZ a
+    let AbsIdxReadStage5Las () = AbsIdxReadStage5 <| Las
 
     let AbsIndJmpStage4 () =
         IfReady <| fun _ ->
@@ -1536,7 +1549,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
                 | Uop.RelBranchStage2Bne -> RelBranchStage2Bne
                 | Uop.RelBranchStage3 -> RelBranchStage3
                 | Uop.RelBranchStage4 -> RelBranchStage4
-                | Uop.Nop -> fun _ -> FetchDummy <| ignore
+                | Uop.Nop -> fun _ -> ReadMemoryS <| ignore
                 | Uop.IncS -> IncS
                 | Uop.Jsr -> Jsr
                 | Uop.PullP -> PullP
@@ -1690,6 +1703,8 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
                 | Uop.EndSuppressInterrupt -> EndSuppressInterrupt
                 | Uop.End -> End
                 | Uop.EndBranchSpecial -> EndBranchSpecial
+                | Uop.JamFFFE -> fun _ -> ReadMemory 0xFFFE ignore |> ignore; true
+                | Uop.JamFFFF -> fun _ -> ReadMemory 0xFFFF ignore |> ignore; true
                 | _ -> fun _ -> ReadMemory 0xFFFF ignore |> ignore; false
 
         let executed = code()

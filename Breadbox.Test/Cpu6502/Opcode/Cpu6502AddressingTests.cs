@@ -247,6 +247,129 @@ namespace Breadbox.Test.Cpu6502.Opcode
         }
 
         [Test]
+        public void IndRead([Values(0x6C)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Values(0x0000, 0x07FF, 0xFFFF)] int absAddress)
+        {
+            // Arrange
+            Cpu.SetPC(address);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            var accesses = new[]
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, address + 2),
+                new AccessEntry(AccessType.Read, absAddress),
+                new AccessEntry(AccessType.Read, (absAddress & 0xFF00) | ((absAddress + 1) & 0xFF))
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void Push([Values(0x08, 0x48)] int opcode, [Random(0x0000, 0xFFFF, 1)] int address)
+        {
+            // Arrange
+            Cpu.SetPC(address);
+            Cpu.SetS(0xFE);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            var accesses = new[]
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Write, 0x01FE)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void Pull([Values(0x28, 0x68)] int opcode, [Random(0x0000, 0xFFFF, 1)] int address)
+        {
+            // Arrange
+            Cpu.SetPC(address);
+            Cpu.SetS(0xFE);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            var accesses = new[]
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, 0x01FE),
+                new AccessEntry(AccessType.Read, 0x01FF)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void Rti([Values(0x40)] int opcode, [Random(0x0000, 0xFFFF, 1)] int address)
+        {
+            // Arrange
+            Cpu.SetPC(address);
+            Cpu.SetS(0xFE);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            var accesses = new[]
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, 0x01FE),
+                new AccessEntry(AccessType.Read, 0x01FF),
+                new AccessEntry(AccessType.Read, 0x0100),
+                new AccessEntry(AccessType.Read, 0x0101)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void Rts([Values(0x60)] int opcode, [Random(0x0000, 0xFFFF, 1)] int address, [Random(0x0000, 0xFFFF, 1)] int returnAddress)
+        {
+            // Arrange
+            Cpu.SetPC(address);
+            Cpu.SetS(0xFE);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(0x01FF)).Returns(returnAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read(0x0100)).Returns((returnAddress >> 8) & 0xFF);
+            var accesses = new[]
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, 0x01FE),
+                new AccessEntry(AccessType.Read, 0x01FF),
+                new AccessEntry(AccessType.Read, 0x0100),
+                new AccessEntry(AccessType.Read, returnAddress)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
+        public void Jsr([Values(0x20)] int opcode, [Random(0x0000, 0xFFFF, 1)] int address)
+        {
+            // Arrange
+            Cpu.SetPC(address);
+            Cpu.SetS(0xFE);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            var accesses = new[]
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, 0x01FE),
+                new AccessEntry(AccessType.Write, 0x01FE),
+                new AccessEntry(AccessType.Write, 0x01FD),
+                new AccessEntry(AccessType.Read, address + 2)
+            };
+
+            // Assert
+            Verify(accesses);
+        }
+
+        [Test]
         public void AbsRead([Values(0x0D, 0x2D, 0x4D, 0x6D, 0xAD, 0xCD, 0xED)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x0000, 0xFFFF, 1)] int absAddress)
         {
             // Arrange
