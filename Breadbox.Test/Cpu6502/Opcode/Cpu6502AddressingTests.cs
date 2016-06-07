@@ -39,15 +39,31 @@ namespace Breadbox.Test.Cpu6502.Opcode
                 switch (access.AccessType)
                 {
                     case AccessType.Read:
-                        Console.WriteLine("Verifying READ at ${0:x4}", address);
-                        MemoryMock.Verify(m => m.Read(It.IsIn(address)), Times.Once);
-                        MemoryMock.Verify(m => m.Read(It.IsNotIn(address)), Times.Never);
+                        if (address >= 0)
+                        {
+                            Console.WriteLine("Verifying READ at ${0:x4}", address);
+                            MemoryMock.Verify(m => m.Read(It.IsIn(address)), Times.Once);
+                            MemoryMock.Verify(m => m.Read(It.IsNotIn(address)), Times.Never);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Verifying READ at any address");
+                            MemoryMock.Verify(m => m.Read(It.IsAny<int>()), Times.Once);
+                        }
                         MemoryMock.Verify(m => m.Write(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
                         break;
                     case AccessType.Write:
-                        Console.WriteLine("Verifying WRITE at ${0:x4}", address);
-                        MemoryMock.Verify(m => m.Write(It.IsIn(address), It.IsAny<int>()), Times.Once);
-                        MemoryMock.Verify(m => m.Write(It.IsNotIn(address), It.IsAny<int>()), Times.Never);
+                        if (address >= 0)
+                        {
+                            Console.WriteLine("Verifying WRITE at ${0:x4}", address);
+                            MemoryMock.Verify(m => m.Write(It.IsIn(address), It.IsAny<int>()), Times.Once);
+                            MemoryMock.Verify(m => m.Write(It.IsNotIn(address), It.IsAny<int>()), Times.Never);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Verifying WRITE at any address");
+                            MemoryMock.Verify(m => m.Write(It.IsAny<int>(), It.IsAny<int>()), Times.Once);
+                        }
                         MemoryMock.Verify(m => m.Read(It.IsAny<int>()), Times.Never);
                         break;
                 }
@@ -57,7 +73,32 @@ namespace Breadbox.Test.Cpu6502.Opcode
         }
 
         [Test]
-        public void Implied([Values(0xCA, 0x88, 0xE8)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address)
+        public void Break([Values(0x00)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x0000, 0xFFFF, 1)] int interruptVector)
+        {
+            // Arrange
+            Cpu.SetPC(address);
+            Cpu.SetS(0xFD);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(0xFFFE)).Returns(interruptVector & 0xFF);
+            MemoryMock.Setup(m => m.Read(0xFFFF)).Returns((interruptVector >> 8) & 0xFF);
+            var accesses = new[]
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Write, 0x01FD),
+                new AccessEntry(AccessType.Write, 0x01FC),
+                new AccessEntry(AccessType.Write, 0x01FB),
+                new AccessEntry(AccessType.Read, 0xFFFE),
+                new AccessEntry(AccessType.Read, 0xFFFF)
+            };
+
+            // Assert
+            Verify(accesses);
+            Cpu.PC.Should().Be(interruptVector);
+        }
+
+        [Test]
+        public void Implied([Values(0x0A, 0x18, 0x1A, 0x2A, 0x38, 0x3A, 0x4A, 0x58, 0x5A, 0x6A, 0x78, 0x7A, 0x88, 0x8A, 0x98, 0x9A, 0xA8, 0xAA, 0xB8, 0xBA, 0xC8, 0xCA, 0xD8, 0xDA, 0xE8, 0xEA, 0xF8, 0xFA)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address)
         {
             // Arrange
             Cpu.SetPC(address);
@@ -70,10 +111,11 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 1);
         }
 
         [Test]
-        public void Immediate([Values(0x09, 0x29, 0xE9)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address)
+        public void Immediate([Values(0x09, 0x0B, 0x29, 0x2B, 0x49, 0x4B, 0x69, 0x6B, 0x80, 0x82, 0x89, 0x8B, 0xA0, 0xA2, 0xA9, 0xAB, 0xC0, 0xC2, 0xC9, 0xCB, 0xE0, 0xE2, 0xE9, 0xEB)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address)
         {
             // Arrange
             Cpu.SetPC(address);
@@ -86,10 +128,11 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
-        public void ZpRead([Values(0x05, 0x25, 0xE5)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress)
+        public void ZpRead([Values(0x04, 0x05, 0x24, 0x25, 0x44, 0x45, 0x64, 0x65, 0xA4, 0xA5, 0xA6, 0xA7, 0xC4, 0xC5, 0xE4, 0xE5)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress)
         {
             // Arrange
             Cpu.SetPC(address);
@@ -104,10 +147,11 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
-        public void ZpWrite([Values(0x84, 0x85, 0x86)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress)
+        public void ZpWrite([Values(0x84, 0x85, 0x86, 0x87)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress)
         {
             // Arrange
             Cpu.SetPC(address);
@@ -122,6 +166,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -142,6 +187,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -162,6 +208,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -182,6 +229,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -204,6 +252,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -224,6 +273,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -244,16 +294,19 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
-        public void IndRead([Values(0x6C)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Values(0x0000, 0x07FF, 0xFFFF)] int absAddress)
+        public void IndRead([Values(0x6C)] int opcode, [Random(0x0000, 0xFFFD, 1)] int address, [Values(0x0000, 0x07FF, 0xFFFF)] int absAddress, [Random(0x0000, 0xFFFF, 1)] int targetAddress)
         {
             // Arrange
             Cpu.SetPC(address);
             MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
             MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
             MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            MemoryMock.Setup(m => m.Read(absAddress)).Returns(targetAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read((absAddress & 0xFF00) | ((absAddress + 1) & 0xFF))).Returns((targetAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -265,6 +318,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(targetAddress);
         }
 
         [Test]
@@ -283,6 +337,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 1);
         }
 
         [Test]
@@ -302,15 +357,18 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 1);
         }
 
         [Test]
-        public void Rti([Values(0x40)] int opcode, [Random(0x0000, 0xFFFF, 1)] int address)
+        public void Rti([Values(0x40)] int opcode, [Random(0x0000, 0xFFFF, 1)] int address, [Random(0x0000, 0xFFFF, 1)] int returnAddress)
         {
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetS(0xFE);
             MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(0x0100)).Returns(returnAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read(0x0101)).Returns((returnAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -323,6 +381,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(returnAddress);
         }
 
         [Test]
@@ -346,15 +405,18 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(returnAddress + 1);
         }
 
         [Test]
-        public void Jsr([Values(0x20)] int opcode, [Random(0x0000, 0xFFFF, 1)] int address)
+        public void Jsr([Values(0x20)] int opcode, [Random(0x0000, 0xFFFF, 1)] int address, [Random(0x0000, 0xFFFF, 1)] int absAddress)
         {
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetS(0xFE);
             MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -367,6 +429,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(absAddress);
         }
 
         [Test]
@@ -387,6 +450,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
         }
 
         [Test]
@@ -407,6 +471,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
         }
 
         [Test]
@@ -429,6 +494,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
         }
 
         [Test]
@@ -455,6 +521,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
         }
 
         [Test]
@@ -478,6 +545,31 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
+        }
+
+        [Test]
+        public void ShyAbx([Values(0x9C)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x0000, 0xFFFF, 1)] int absAddress, [Values(0x00, 0xFF)] int x)
+        {
+            // Arrange
+            address |= 0x80;
+            Cpu.SetPC(address);
+            Cpu.SetX(x);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            var accesses = new List<AccessEntry>
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, address + 2),
+                new AccessEntry(AccessType.Read, (absAddress & 0xFF00) | ((absAddress + x) & 0xFF)),
+                new AccessEntry(AccessType.Write, -1)
+            };
+
+            // Assert
+            Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
         }
 
         [Test]
@@ -503,6 +595,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
         }
 
         [Test]
@@ -529,6 +622,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
         }
 
         [Test]
@@ -552,6 +646,31 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
+        }
+
+        [Test]
+        public void AbyWriteIllegal([Values(0x9E, 0x9F)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x0000, 0xFFFF, 1)] int absAddress, [Values(0x00, 0xFF)] int y)
+        {
+            // Arrange
+            address |= 0x80;
+            Cpu.SetPC(address);
+            Cpu.SetY(y);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            var accesses = new List<AccessEntry>
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, address + 2),
+                new AccessEntry(AccessType.Read, (absAddress & 0xFF00) | ((absAddress + y) & 0xFF)),
+                new AccessEntry(AccessType.Write, -1)
+            };
+
+            // Assert
+            Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
         }
 
         [Test]
@@ -577,6 +696,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 3);
         }
 
         [Test]
@@ -603,6 +723,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -629,6 +750,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -657,6 +779,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -686,6 +809,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -712,6 +836,34 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
+        }
+
+        [Test]
+        public void AhxIzy([Values(0x93)] int opcode, [Random(0x0000, 0xFFFE, 1)] int address, [Random(0x00, 0xFF, 1)] int zpAddress, [Random(0x00, 0xFF, 1)] int absAddress, [Values(0x00, 0xFF)] int y)
+        {
+            // Arrange
+            address |= 0x80;
+            Cpu.SetPC(address);
+            Cpu.SetY(y);
+            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            MemoryMock.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
+            MemoryMock.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+
+            var accesses = new List<AccessEntry>
+            {
+                new AccessEntry(AccessType.Read, address),
+                new AccessEntry(AccessType.Read, address + 1),
+                new AccessEntry(AccessType.Read, zpAddress),
+                new AccessEntry(AccessType.Read, (zpAddress + 1) & 0xFF),
+                new AccessEntry(AccessType.Read, (absAddress & 0xFF00) | ((absAddress + y) & 0xFF)),
+                new AccessEntry(AccessType.Write, -1)
+            };
+
+            // Assert
+            Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
 
         [Test]
@@ -740,7 +892,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Assert
             Verify(accesses);
+            Cpu.PC.Should().Be(address + 2);
         }
-
     }
 }

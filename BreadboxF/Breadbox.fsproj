@@ -51,6 +51,7 @@
     <Compile Include="Mos6502Disassembler.fs" />
     <Compile Include="RomChip.fs" />
     <Compile Include="RamChip.fs" />
+    <Compile Include="System.Commodore64SystemPla.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
