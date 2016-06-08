@@ -234,11 +234,18 @@ type private Uop =
     | JamFFFF
     | JamFFFE
 
-type Mos6502Configuration(lxaConstant:int, hasDecimalMode:bool) =
+type Mos6502Configuration(lxaConstant:int, hasDecimalMode:bool, port:IPort, memory:IMemory, ready:IReadySignal) =
     member val LxaConstant = lxaConstant
     member val HasDecimalMode = hasDecimalMode
+    member val Memory = memory
+    member val Ready = ready
+    member val Port = port
+    member val HasPort =
+        match box port with
+            | null -> false
+            | _ -> true
 
-type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
+type Mos6502(config:Mos6502Configuration) =
     let jamMicrocodes =
         [|
             Uop.Fetch2;
@@ -647,11 +654,51 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     let mutable z = false
     let mutable c = false
 
+    let mutable ioLatch = 0xFF
+    let mutable ioDirection = 0x00
+
+    let mutable totalCycles = 0UL
+
     let lxaConstant = config.LxaConstant
     let hasDecimalMode = config.HasDecimalMode
-    let readRdy = ready.ReadRdy
-    let read = memory.Read
-    let write = memory.Write
+    let readRdy = config.Ready.ReadRdy
+    let memoryReadRaw = config.Memory.Read
+    let memoryWriteRaw = config.Memory.Write
+
+    let readPort =
+        if config.HasPort then
+            config.Port.ReadPort
+        else
+            fun _ ->
+                0xFF
+
+    let read =
+        if config.HasPort then
+            fun address ->
+                match address with
+                    | 0x00 ->
+                        memoryReadRaw(address) |> ignore
+                        ioDirection
+                    | 0x01 ->
+                        memoryReadRaw(address) |> ignore
+                        (ioLatch ||| ((~~~ioDirection) &&& readPort())) &&& 0xFF
+                    | _ -> memoryReadRaw(address)
+        else
+            memoryReadRaw
+
+    let write =
+        if config.HasPort then
+            fun (address, value) ->
+                match address with
+                    | 0x00 ->
+                        memoryReadRaw(address) |> ignore
+                        ioDirection <- value
+                    | 0x01 ->
+                        memoryReadRaw(address) |> ignore
+                        ioLatch <- value
+                    | _ -> memoryWriteRaw(address, value)
+        else
+            memoryWriteRaw
 
     let SoftReset () =
         i <- true
@@ -1015,7 +1062,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     // ----- uOPS -----
 
 
-    let FetchDiscard address operation = ReadMemory address <| (ignore >> operation)
+    let FetchDiscard address operation = ReadMemory address <| fun _ -> operation()
     let FetchDummy operation = FetchDiscard pc <| operation
 
     let Fetch1RealInternal () =
@@ -1502,7 +1549,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
                 | Uop.NzX -> fun _ -> FetchDummy <| NZX
                 | Uop.NzY -> fun _ -> FetchDummy <| NZY
                 | Uop.ImpTsx -> ImpTsx
-                | Uop.ImpTxs -> ImpTsx
+                | Uop.ImpTxs -> ImpTxs
                 | Uop.ImpTax -> ImpTax
                 | Uop.ImpTay -> ImpTay
                 | Uop.ImpTya -> ImpTya
@@ -1717,11 +1764,11 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         if executed then
             mi <- mi + 1
 
-        if not restart then
-            ()
-        else
+        if restart then
             restart <- false
             ExecuteOneRetry()
+        else
+            totalCycles <- totalCycles + 1UL
 
 
     // ----- Interface -----
@@ -1737,6 +1784,11 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         while remaining > 0 do
             ExecuteOneRetry()
             remaining <- remaining - 1
+
+    member this.ClockToAddress address =
+        rdy <- readRdy()
+        while not (pc = address) do
+            ExecuteOneRetry()
 
     member this.ClockStep () =
         rdy <- readRdy()
@@ -1787,4 +1839,5 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     member this.ForceOpcodeSync () =
         this.SetOpcode vopFetch1
         
+    member this.TotalCycles = totalCycles
 

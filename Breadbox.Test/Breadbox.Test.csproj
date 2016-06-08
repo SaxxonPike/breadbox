@@ -64,6 +64,7 @@
     <Compile Include="Cpu6502\Cpu6502InterruptTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502ExecutionBaseTestFixture.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502FlagOpcodeTests.cs" />
+    <Compile Include="Cpu6502\Opcode\Cpu6502TransferTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502ShiftTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502BitTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502BranchTests.cs" />

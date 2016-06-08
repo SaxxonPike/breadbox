@@ -33,6 +33,9 @@ type IReadySignal =
 type IVicBank =
     abstract member ReadVicBank: unit -> int
 
+type IPort =
+    abstract member ReadPort: unit -> int
+
 type MemoryNull () =
     interface IMemory with
         member this.Read (address) = 0

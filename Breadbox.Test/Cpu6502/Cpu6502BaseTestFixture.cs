@@ -21,13 +21,13 @@ namespace Breadbox.Test.Cpu6502
         [SetUp]
         public void Initialize()
         {
-            _config = Config;
             SetUpMocks();
 
             var memory = MemoryMock != null ? MemoryMock.Object : new MemoryNull();
             var ready = ReadySignalMock != null ? ReadySignalMock.Object : new ReadySignalNull();
 
-            Cpu = new Mos6502(_config, memory, ready);
+            _config = new Mos6502Configuration(0xFF, true, null, memory, ready);
+            Cpu = new Mos6502(_config);
             _stopwatch = new Stopwatch();
             _stopwatch.Start();
         }
@@ -41,10 +41,7 @@ namespace Breadbox.Test.Cpu6502
 
         protected virtual Mos6502Configuration Config
         {
-            get
-            {
-                return new Mos6502Configuration(0xFF, true);
-            }
+            get { return _config; }
         }
 
         protected virtual void SetUpMocks()

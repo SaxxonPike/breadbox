@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using Breadbox.System;
 using Breadbox.Test.Properties;
@@ -12,6 +13,8 @@ namespace Breadbox.Test.Cpu6502.Integration
 {
     public class Cpu6502Commodore64KernalTest
     {
+        protected bool TraceEnabled { get; set; }
+
         private class MockSignals : ILoRamSignal, IHiRamSignal, IGameSignal, IExRomSignal, ICharenSignal, IVicBank
         {
             public bool ReadLoRam()
@@ -45,6 +48,22 @@ namespace Breadbox.Test.Cpu6502.Integration
             }
         }
 
+        private void TraceRead(int address)
+        {
+            if (TraceEnabled)
+            {
+                Console.WriteLine("READ   ${0:x4}", address);
+            }
+        }
+
+        private void TraceWrite(int address, int value)
+        {
+            if (TraceEnabled)
+            {
+                Console.WriteLine("WRITE  ${0:x4} <- #${1:x2}", address, value);
+            }
+        }
+
         [Test]
         [Explicit("Manual only.")]
         public void Test1()
@@ -72,7 +91,7 @@ namespace Breadbox.Test.Cpu6502.Integration
             kernal.Flash(Resources.kernal_901227_03.Select(i => (int)i).ToArray());
             basic.Flash(Resources.basic_901226_01.Select(i => (int)i).ToArray());
 
-            var traceEnabled = false;
+            TraceEnabled = false;
             var plaConfig = new Commodore64SystemPlaConfiguration(
                 signalMock,
                 signalMock,
@@ -91,11 +110,12 @@ namespace Breadbox.Test.Cpu6502.Integration
                 );
             var pla = new Commodore64SystemPla(plaConfig);
             var bus = pla.SystemBus;
+            var tracer = new MemoryTrace(bus, TraceRead, TraceWrite);
 
-            var cpu = new Mos6502(new Mos6502Configuration(0xFF, true), bus, new ReadySignalNull());
+            var cpu = new Mos6502(new Mos6502Configuration(0xFF, true, null, tracer, new ReadySignalNull()));
 
             // Act
-            cpu.ClockMultiple(5000000);
+            cpu.ClockMultiple(3000000);
 
             // Assert
             var dump = ram.Dump();
