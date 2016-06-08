@@ -6,9 +6,11 @@ namespace Breadbox.Test.Vic2
     [TestFixture]
     public abstract class Vic2RegionAgnosticBaseTestFixture : Vic2BaseTestFixture
     {
+        private CommodoreVic2Configuration _config;
+
         protected override CommodoreVic2Configuration Config
         {
-            get { return GetRandomConfig(); }
+            get { return _config ?? (_config = GetRandomConfig()); }
         }
 
         private static CommodoreVic2Configuration GetRandomConfig()

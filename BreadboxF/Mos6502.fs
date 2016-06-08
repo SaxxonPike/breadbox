@@ -668,7 +668,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
         b <- false
         d <- false
         z <- false
-        c <- false        
+        c <- false
         SoftReset()
 
     let GetP () =
@@ -1015,7 +1015,7 @@ type Mos6502(config:Mos6502Configuration, memory:IMemory, ready:IReadySignal) =
     // ----- uOPS -----
 
 
-    let FetchDiscard address operation = ReadMemory address (fun _ -> operation())
+    let FetchDiscard address operation = ReadMemory address <| (ignore >> operation)
     let FetchDummy operation = FetchDiscard pc <| operation
 
     let Fetch1RealInternal () =

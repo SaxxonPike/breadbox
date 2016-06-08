@@ -6,7 +6,7 @@ type CommodoreVic2Configuration(vBlankSet, cyclesPerRasterLine, rasterLinesPerFr
     let hBlankSet = 0x18C - rasterOffset
     let hBlankClear = 0x1E8 - (System.Math.Max(0, 64 - cyclesPerRasterLine) * 8)
     let vBlankClear = (vBlankSet + 28) % rasterLinesPerFrame
-    let rasterOpsX = hBlankClear - 0x094 // 0x15C - rasterOffset 
+    let rasterOpsX = hBlankClear - 0x094 // 0x15C - rasterOffsret 
     let rasterIncrement = hBlankClear - 0x04C
     let visibleRasterLines = rasterLinesPerFrame - 28
     let visiblePixelsPerRasterLine = rasterWidth - 100
@@ -87,7 +87,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
         arr.[5] <- false
         arr.[6] <- false
         arr.[7] <- false
-    
+
 
     // ========================================================================
     // Registers
@@ -194,7 +194,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
 
     // Raster Line Counter
     // - This determines the Raster X position as well as all horizontal timed operations.
-    let rasterX = Array.init rasterWidth (fun counter ->
+    let rasterXMap = Array.init rasterWidth (fun counter ->
         if rasterWidth <= 0x200 || counter <= 0x18C then
             counter
         else
@@ -208,8 +208,6 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
     let nextRasterLineCounter = Array.init rasterWidth (fun x -> if x >= (rasterWidth - 1) then 0 else (x + 1))
 
     let mutable rasterLineCounter = rasterIncrement - 1
-    let GetRasterX () =
-        rasterX.[rasterLineCounter]
 
     // Blanking
     let vBlankY = Array.init rasterLinesPerFrame (fun y ->
@@ -218,7 +216,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
         else
             y >= vBlankSet || y < vBlankClear
         )
-    let hBlankX = Array.init rasterWidth (fun x -> rasterX.[x] >= hBlankSet && rasterX.[x] < hBlankClear)
+    let hBlankX = Array.init rasterWidth (fun x -> rasterXMap.[x] >= hBlankSet && rasterXMap.[x] < hBlankClear)
 
     // Memory Access Cycles (BA for sprite 0 begins the sequence)
     let memoryAccessCycle = Array.init rasterWidth (fun counter ->
@@ -227,8 +225,6 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
         else
             (((rasterWidth - rasterOpsX) + counter) % rasterWidth) / 4
         )
-    let GetMemoryAccessCycle () =
-        memoryAccessCycle.[rasterLineCounter]
 
     // RC
     let mutable rowCounter = 0
@@ -291,8 +287,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
     // ========================================================================
 
 
-    let mutable mac = 18
-    let mutable rasterX = GetRasterX()
+    let mutable mac = memoryAccessCycle.[rasterLineCounter]
+    let mutable rasterX = rasterXMap.[rasterLineCounter]
 
     // Raster Counter
     // (PAL cycle to MAC table)
@@ -305,17 +301,54 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
     // 61: 12  SS   6:  28  SS  14: 44  R-  22: 60  GC  30: 76  GC  38: 92  GC  46: 108 GC  54: 124 GC
     // 62: 14  PS   7:  30  PS  15: 46  RC  23: 62  GC  31: 78  GC  39: 94  GC  47: 110 GC
 
+    let ToggleExpansionIfEnabled () =
+        for index = 0 to 7 do
+            mobYExpansionToggle.[index] <- mobYExpansionToggle.[index] <> mobYExpansionEnabled.[index]
+
+    let CheckSpriteEnable () =
+        for index = 0 to 7 do
+            if mobEnabled.[index] && (mobY.[index] &&& 0x7) = (rasterY &&& 0x7) then
+                if not mobDma.[index] then
+                    mobDma.[index] <- true
+                    mobCounterBase.[index] <- 0
+                    mobYExpansionToggle.[index] <- mobYExpansionToggle.[index] && (not mobYExpansionEnabled.[index])
+
+    let CheckSpriteDma () =
+        for index = 0 to 7 do
+            mobShiftRegisterEnable.[index] <- false
+            mobCounter.[index] <- mobCounterBase.[index]
+            if mobDma.[index] then
+                if (mobY.[index] &&& 0x7) = (rasterY &&& 0x7) then
+                    mobDisplay.[index] <- true
+            else
+                mobDisplay.[index] <- false
+
+    let CheckSpriteCrunch () =
+        for index = 0 to 7 do
+            if mobYExpansionToggle.[index] then
+                mobCounterBase.[index] <-
+                    if mobDataCrunch.[index] then
+                        (0x2A &&& (mobCounterBase.[index] &&& mobCounter.[index])) ||| (0x15 &&& (mobCounterBase.[index] ||| mobCounter.[index]))
+                    else
+                        mobCounter.[index]
+                if mobCounterBase.[index] = 63 then
+                    mobDma.[index] <- false
+
     let ClockRasterCounter () =
-        if rasterLineCounter = rasterIncrement then
-            rasterY <- nextRasterY.[rasterY]
-            if rasterY = 0x0F8 then
-                badLinesEnabled <- false
-                badLine <- false
-            if rasterY = 0x000 then
-                videoCounterBase <- 0
-                lightPenTriggeredThisFrame <- false
-            if rasterY = rasterYCompareValue then
-                rasterIrqDelay <- (if rasterY = 0 then 8 else 0)
+        match rasterLineCounter with
+            | x when x = rasterIncrement ->
+                rasterY <- nextRasterY.[rasterY]
+                match rasterY with
+                    | 0x0F8 ->
+                        badLinesEnabled <- false
+                        badLine <- false
+                    | 0x000 ->
+                        videoCounterBase <- 0
+                        lightPenTriggeredThisFrame <- false
+                    | _ -> ()
+                if rasterY = rasterYCompareValue then
+                    rasterIrqDelay <- (if rasterY = 0 then 8 else 0)
+            | _ -> ()
 
         if rasterIrqDelay >= 0 then
             rasterIrqDelay <- rasterIrqDelay - 1
@@ -331,33 +364,13 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
             displayState <- true
 
         match mac with
-            | 0 | 2 ->
-                // cycle 55-56
-                if mac = 0 then
-                    let inline toggleExpansionIfEnabled index =
-                        mobYExpansionToggle.[index] <- mobYExpansionToggle.[index] <> mobYExpansionEnabled.[index]
-                    toggleExpansionIfEnabled 0
-                    toggleExpansionIfEnabled 1
-                    toggleExpansionIfEnabled 2
-                    toggleExpansionIfEnabled 3
-                    toggleExpansionIfEnabled 4
-                    toggleExpansionIfEnabled 5
-                    toggleExpansionIfEnabled 6
-                    toggleExpansionIfEnabled 7
-                let inline checkSpriteEnable (index) =
-                    if mobEnabled.[index] && (mobY.[index] &&& 0x7) = (rasterY &&& 0x7) then
-                        if not mobDma.[index] then
-                            mobDma.[index] <- true
-                            mobCounterBase.[index] <- 0
-                            mobYExpansionToggle.[index] <- mobYExpansionToggle.[index] && (not mobYExpansionEnabled.[index])
-                checkSpriteEnable 0
-                checkSpriteEnable 1
-                checkSpriteEnable 2
-                checkSpriteEnable 3
-                checkSpriteEnable 4
-                checkSpriteEnable 5
-                checkSpriteEnable 6
-                checkSpriteEnable 7
+            | 0 ->
+                // cycle 55
+                ToggleExpansionIfEnabled()
+                CheckSpriteEnable()
+            | 2 ->
+                // cycle 56
+                CheckSpriteEnable()
             | 6 ->
                 // cycle 58
                 if rowCounter = 7 then
@@ -365,22 +378,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
                     videoCounterBase <- videoCounter
                 if displayState then
                     rowCounter <- (rowCounter + 1) &&& 0x7
-                let inline reloadMobCounter index =
-                    mobShiftRegisterEnable.[index] <- false
-                    mobCounter.[index] <- mobCounterBase.[index]
-                    if mobDma.[index] then
-                        if (mobY.[index] &&& 0x7) = (rasterY &&& 0x7) then
-                            mobDisplay.[index] <- true
-                    else
-                        mobDisplay.[index] <- false
-                reloadMobCounter 0
-                reloadMobCounter 1
-                reloadMobCounter 2
-                reloadMobCounter 3
-                reloadMobCounter 4
-                reloadMobCounter 5
-                reloadMobCounter 6
-                reloadMobCounter 7
+                CheckSpriteDma()
             | 44 ->
                 // cycle 14
                 videoCounter <- videoCounterBase
@@ -389,138 +387,250 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
                     rowCounter <- 0
             | 48 ->
                 // cycle 16
-                let inline checkSpriteCrunch index =
-                    if mobYExpansionToggle.[index] then
-                        mobCounterBase.[index] <-
-                            if mobDataCrunch.[index] then
-                                (0x2A &&& (mobCounterBase.[index] &&& mobCounter.[index])) ||| (0x15 &&& (mobCounterBase.[index] ||| mobCounter.[index]))
-                            else
-                                mobCounter.[index]
-                        if mobCounterBase.[index] = 63 then
-                            mobDma.[index] <- false
-                checkSpriteCrunch 0
-                checkSpriteCrunch 1
-                checkSpriteCrunch 2
-                checkSpriteCrunch 3
-                checkSpriteCrunch 4
-                checkSpriteCrunch 5
-                checkSpriteCrunch 6
-                checkSpriteCrunch 7
+                CheckSpriteCrunch()
             | _ -> ()
 
     // Memory Interface, Address Generator, Refresh Counter
-    let ClockMemoryInterface () =
-        let inline readP index =
+    let GetReadP index =
+        fun _ ->
             mobPointer.[index] <- (read(videoMemoryPointer ||| 0x3F8 ||| index) &&& 0xFF) <<< 6
+    let ReadP0 = GetReadP 0
+    let ReadP1 = GetReadP 1
+    let ReadP2 = GetReadP 2
+    let ReadP3 = GetReadP 3
+    let ReadP4 = GetReadP 4
+    let ReadP5 = GetReadP 5
+    let ReadP6 = GetReadP 6
+    let ReadP7 = GetReadP 7
 
-        let inline readS index counter =
+    let GetReadS index counter =
+        fun _ ->
             if mobDma.[index] then
                 mobShiftRegister.[index] <- (mobShiftRegister.[index] <<< 8) ||| (read(mobCounter.[index] ||| mobPointer.[index]) &&& 0xFF)
                 mobCounter.[index] <- mobCounter.[index] + 1
             else
                 if counter = 1 then
                     read(0x3FFF) |> ignore
+    let ReadS00 = GetReadS 0 0
+    let ReadS01 = GetReadS 0 1
+    let ReadS02 = GetReadS 0 2
+    let ReadS10 = GetReadS 1 0
+    let ReadS11 = GetReadS 1 1
+    let ReadS12 = GetReadS 1 2
+    let ReadS20 = GetReadS 2 0
+    let ReadS21 = GetReadS 2 1
+    let ReadS22 = GetReadS 2 2
+    let ReadS30 = GetReadS 3 0
+    let ReadS31 = GetReadS 3 1
+    let ReadS32 = GetReadS 3 2
+    let ReadS40 = GetReadS 4 0
+    let ReadS41 = GetReadS 4 1
+    let ReadS42 = GetReadS 4 2
+    let ReadS50 = GetReadS 5 0
+    let ReadS51 = GetReadS 5 1
+    let ReadS52 = GetReadS 5 2
+    let ReadS60 = GetReadS 6 0
+    let ReadS61 = GetReadS 6 1
+    let ReadS62 = GetReadS 6 2
+    let ReadS70 = GetReadS 7 0
+    let ReadS71 = GetReadS 7 1
+    let ReadS72 = GetReadS 7 2
 
-        let inline readC () =
-            if badLine then
-                graphicsReadC <- read(videoMemoryPointer ||| videoCounter)
-                if videoMatrixLineIndex < 40 then
-                    videoMatrixLineMemory.[videoMatrixLineIndex] <- graphicsReadC
-            else
-                read(0x3FFF) |> ignore
+    let ReadC () =
+        if badLine then
+            graphicsReadC <- read(videoMemoryPointer ||| videoCounter)
+            if videoMatrixLineIndex < 40 then
+                videoMatrixLineMemory.[videoMatrixLineIndex] <- graphicsReadC
 
-        let inline readG () =
-            graphicsReadG <-
-                read((if extraColorMode then 0x39FF else 0x3FFF) &&&
-                    if (displayState) then
-                        if (bitmapMode) then
-                            (characterBankPointer &&& 0x2000) ||| (videoCounter <<< 3) ||| rowCounter
-                        else
-                            let videoMatrixLineMemory =
-                                if videoMatrixLineIndex < 40 then
-                                    videoMatrixLineMemory.[videoMatrixLineIndex] else 0
-                            characterBankPointer ||| ((videoMatrixLineMemory &&& 0xFF) <<< 3) ||| rowCounter
+    let ReadG () =
+        graphicsReadG <-
+            read((if extraColorMode then 0x39FF else 0x3FFF) &&&
+                if (displayState) then
+                    if (bitmapMode) then
+                        (characterBankPointer &&& 0x2000) ||| (videoCounter <<< 3) ||| rowCounter
                     else
-                        0x3FFF
-                ) &&& 0xFF
-            videoCounter <- (videoCounter + 1) &&& 0x3FF
-            videoMatrixLineIndex <- (videoMatrixLineIndex + 1) &&& 0x3F
-
-        let inline readI () =
-            read(0x3FFF) |> ignore
-
-        let inline readR () =
-            refreshCounter <- (refreshCounter - 1) &&& 0xFF
-            read(0x3F00 ||| refreshCounter) |> ignore
-
-        match mac with
-            | -1 -> ()
-            |  0 -> if (cyclesPerRasterLine < 64) then readG() else readI()
-            |  2 |  4 -> readI()
-            |  6 -> readP 0
-            |  7 -> readS 0 0
-            |  8 -> readS 0 1
-            |  9 -> readS 0 2
-            | 10 -> readP 1
-            | 11 -> readS 1 0
-            | 12 -> readS 1 1
-            | 13 -> readS 1 2
-            | 14 -> readP 2
-            | 15 -> readS 2 0
-            | 16 -> readS 2 1
-            | 17 -> readS 2 2
-            | 18 -> readP 3
-            | 19 -> readS 3 0
-            | 20 -> readS 3 1
-            | 21 -> readS 3 2
-            | 22 -> readP 4
-            | 23 -> readS 4 0
-            | 24 -> readS 4 1
-            | 25 -> readS 4 2
-            | 26 -> readP 5
-            | 27 -> readS 5 0
-            | 28 -> readS 5 1
-            | 29 -> readS 5 2
-            | 30 -> readP 6
-            | 31 -> readS 6 0
-            | 32 -> readS 6 1
-            | 33 -> readS 6 2
-            | 34 -> readP 7
-            | 35 -> readS 7 0
-            | 36 -> readS 7 1
-            | 37 -> readS 7 2
-            | 38 | 40 | 42 | 44 | 46 -> readR()
-            | x ->
-                if x &&& 1 = 0 then
-                    if x >= 48 && x < 128 then
-                        readG()
-                    else
-                        readI()
+                        characterBankPointer |||
+                        (((if videoMatrixLineIndex < 40 then videoMatrixLineMemory.[videoMatrixLineIndex] else 0) &&& 0xFF) <<< 3) |||
+                        rowCounter
                 else
-                    if x >= 47 && x < 127 then
-                        readC()
+                    0x3FFF
+            ) &&& 0xFF
+        videoCounter <- (videoCounter + 1) &&& 0x3FF
+        videoMatrixLineIndex <- (videoMatrixLineIndex + 1) &&& 0x3F
+
+    let ReadI () =
+        read(0x3FFF) |> ignore
+
+    let ReadR () =
+        refreshCounter <- (refreshCounter - 1) &&& 0xFF
+        read(0x3F00 ||| refreshCounter) |> ignore
+
+    let ReadNone () = ()
+
+    let MacMap = [|
+        // 000
+        (if (cyclesPerRasterLine < 64) then ReadG else ReadI);
+        ReadNone;
+        (if (cyclesPerRasterLine < 63) then ReadG else ReadI);
+        ReadNone;
+        (if (cyclesPerRasterLine < 62) then ReadG else ReadI);
+        ReadNone;
+        ReadP0;
+        ReadS00;
+        ReadS01;
+        ReadS02;
+        // 010
+        ReadP1;
+        ReadS10;
+        ReadS11;
+        ReadS12;
+        ReadP2;
+        ReadS20;
+        ReadS21;
+        ReadS22;
+        ReadP3;
+        ReadS30;
+        // 020
+        ReadS31;
+        ReadS32;
+        ReadP4;
+        ReadS40;
+        ReadS41;
+        ReadS42;
+        ReadP5;
+        ReadS50;
+        ReadS51;
+        ReadS52;
+        // 030
+        ReadP6;
+        ReadS60;
+        ReadS61;
+        ReadS62;
+        ReadP7;
+        ReadS70;
+        ReadS71;
+        ReadS72;
+        ReadR;
+        ReadNone;
+        // 040
+        ReadR;
+        ReadNone;
+        ReadR;
+        ReadNone;
+        ReadR;
+        ReadNone;
+        ReadR;
+        ReadC;
+        ReadG;
+        ReadC;
+        // 050
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        // 060
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        // 070
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        // 080
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        // 090
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        // 100
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        // 110
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        // 120
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+        ReadC;
+        ReadG;
+    |]
+
+    let ClockMemoryInterface () =
+        () |>
+            match mac with
+                | x when x >= 0 && x < 127 -> MacMap.[x]
+                | x when (x &&& 1) = 0 -> ReadI
+                | _ -> ReadNone
 
     let ClockBaAec () =
         ba <-
-            if mac = -1 then
-                ba
-            else
-                let IsBadLineBa =
-                    badLine && mac >= 40 && mac < 126
-                let inline IsSpriteBa index =
-                    let lowerBound = index * 4
-                    let upperBound = lowerBound + 10
-                    mac >= lowerBound && mac < upperBound && mobDma.[index]
-                let inline IsAnySpriteBa () =
-                    IsSpriteBa 0 ||
-                    IsSpriteBa 1 ||
-                    IsSpriteBa 2 ||
-                    IsSpriteBa 3 ||
-                    IsSpriteBa 4 ||
-                    IsSpriteBa 5 ||
-                    IsSpriteBa 6 ||
-                    IsSpriteBa 7
-                not (IsBadLineBa || IsAnySpriteBa())
+            match mac with
+                | -1 -> ba
+                | x when x >= 40 && x < 126 -> not badLine
+                | x when x >= 0 && x < 10 && mobDma.[0] -> false
+                | x when x >= 4 && x < 14 && mobDma.[1] -> false
+                | x when x >= 8 && x < 18 && mobDma.[2] -> false
+                | x when x >= 12 && x < 22 && mobDma.[3] -> false
+                | x when x >= 16 && x < 26 && mobDma.[4] -> false
+                | x when x >= 20 && x < 30 && mobDma.[5] -> false
+                | x when x >= 24 && x < 34 && mobDma.[6] -> false
+                | x when x >= 28 && x < 38 && mobDma.[7] -> false
+                | _ -> true
         baCounter <-
             if ba then
                 24
@@ -538,10 +648,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
             (rasterIrq && rasterIrqEnabled)
 
     let ClockSprites () =
-        let inline ClockSprite index =
-            let display = mobDisplay.[index]
-            if display then
-                let expandX = mobXExpansionEnabled.[index]
+        for index = 0 to 7 do
+            if mobDisplay.[index] then
                 if not mobShiftRegisterEnable.[index] then
                     if mobX.[index] = rasterX then
                         mobShiftRegisterEnable.[index] <- true
@@ -552,15 +660,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
                             mobShiftRegisterOutput.[index] <- (if multiColor then 0xC00000 else 0x800000)
                             mobShiftRegister.[index] <- mobShiftRegister.[index] <<< (if multiColor then 2 else 1)
                         mobMultiColorToggle.[index] <- (not multiColor) || (mobMultiColorToggle.[index] <> multiColor)
-                    mobXExpansionToggle.[index] <- (not expandX) || (mobXExpansionToggle.[index] <> expandX)
-        ClockSprite 0
-        ClockSprite 1
-        ClockSprite 2
-        ClockSprite 3
-        ClockSprite 4
-        ClockSprite 5
-        ClockSprite 6
-        ClockSprite 7
+                    mobXExpansionToggle.[index] <- (not mobXExpansionEnabled.[index]) || (mobXExpansionToggle.[index] <> mobXExpansionEnabled.[index])
 
     let ClockGraphics () =
         graphicsShiftRegisterMultiColorToggle <- not graphicsShiftRegisterMultiColorToggle
@@ -608,12 +708,18 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
             borderColor
         else
             mobMobFirstCollidedIndex <- -1
-            let inline outputForSprite index =
+            let mutable spriteOutput = -1
+            for index = 0 to 7 do
                 match mobShiftRegisterOutput.[index] with
-                    | 0x000000 -> -1
+                    | 0x000000 -> ()
                     | bits ->
                         if mobMobFirstCollidedIndex = -1 then
                             mobMobFirstCollidedIndex <- index
+                            spriteOutput <-
+                                match bits with
+                                    | 0x400000 -> mobMultiColor.[0]
+                                    | 0xC00000 -> mobMultiColor.[1]
+                                    | _ -> mobColor.[index]
                         else
                             mobMobCollision.[index] <- true
                             mobMobCollision.[mobMobFirstCollidedIndex] <- true
@@ -622,18 +728,6 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
                                 mobMobCollisionOccurred <- true
                         if (not borderVerticalEnabled) && (graphicsShiftRegisterOutput >= 0x80) then
                             mobDataCollision.[index] <- true
-                        match bits with
-                            | 0x400000 -> mobMultiColor.[0]
-                            | 0xC00000 -> mobMultiColor.[1]
-                            | _ -> mobColor.[index]
-            let spriteOutput0 = outputForSprite 0
-            let spriteOutput1 = outputForSprite 1
-            let spriteOutput2 = outputForSprite 2
-            let spriteOutput3 = outputForSprite 3
-            let spriteOutput4 = outputForSprite 4
-            let spriteOutput5 = outputForSprite 5
-            let spriteOutput6 = outputForSprite 6
-            let spriteOutput7 = outputForSprite 7
             let graphicsOutput =
                 if (extraColorMode && (bitmapMode || multiColorMode)) then
                     0
@@ -665,34 +759,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
                                     graphicsShiftRegisterColor &&& 0x00F
                                 else
                                     backgroundColor.[0]
-            let spriteOutput =
-                if spriteOutput0 = -1 then
-                    if spriteOutput1 = -1 then
-                        if spriteOutput2 = -1 then
-                            if spriteOutput3 = -1 then
-                                if spriteOutput4 = -1 then
-                                    if spriteOutput5 = -1 then
-                                        if spriteOutput6 = -1 then
-                                            spriteOutput7
-                                        else
-                                            spriteOutput6
-                                    else
-                                        spriteOutput5
-                                else
-                                    spriteOutput4
-                            else
-                                spriteOutput3
-                        else
-                            spriteOutput2
-                    else
-                        spriteOutput1
-                else
-                    spriteOutput0
-            if mobMobFirstCollidedIndex >= 0 then
-                if (graphicsShiftRegisterOutput >= 0x80) || (not mobDataPriority.[mobMobFirstCollidedIndex]) then
-                    spriteOutput
-                else
-                    graphicsOutput
+            if (mobMobFirstCollidedIndex >= 0) && ((graphicsShiftRegisterOutput >= 0x80) || (not mobDataPriority.[mobMobFirstCollidedIndex])) then
+                spriteOutput
             else
                 graphicsOutput
 
@@ -701,13 +769,8 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
         while i > 0 do
             i <- i - 1
             rasterLineCounter <- nextRasterLineCounter.[rasterLineCounter]
-            mac <- GetMemoryAccessCycle()
-            rasterX <- GetRasterX()
-
-            let isPhi0 =
-                rasterLineCounter &&& 0x4 <> 0
-            let isPhi1 =
-                rasterLineCounter &&& 0x4 = 0
+            mac <- memoryAccessCycle.[rasterLineCounter]
+            rasterX <- rasterXMap.[rasterLineCounter]
 
             ClockRasterCounter()
             ClockBorder()
@@ -718,9 +781,10 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
             ClockIrq()
 
             match (rasterLineCounter &&& 0x7) with
-                | 0 -> clockPhi1.Clock()
-                | 4 -> clockPhi2.Clock()
-                | _ -> ()
+                | 0 -> clockPhi1.Clock
+                | 4 -> clockPhi2.Clock
+                | _ -> ignore
+            <| ()
 
             let pixel = ClockPixel()
             let hBlank = hBlankX.[rasterLineCounter]
@@ -1014,7 +1078,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
 
     member this.TriggerLightPen() =
         if not lightPenTriggeredThisFrame then
-            lightPenX <- GetRasterX() >>> 1
+            lightPenX <- rasterX >>> 1
             lightPenY <- rasterY
             lightPenTriggeredThisFrame <- true
             lightPenIrq <- true
@@ -1024,7 +1088,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
     member this.OutputAec = aec
     
     member this.RasterLineCounter = rasterLineCounter
-    member this.RasterX = GetRasterX()
+    member this.RasterX = rasterX
     member this.RasterYCompareValue = rasterYCompareValue
     member this.SpriteCrunched(index) = mobDataCrunch.[index]
     member this.SpriteDisplay(index) = mobDisplay.[index]
@@ -1073,7 +1137,7 @@ type CommodoreVic2Chip(config:CommodoreVic2Configuration, memory:IMemory, clockP
     member this.BackgroundColor(index) = backgroundColor.[index]
     member this.SpriteMultiColor(index) = mobMultiColor.[index]
     member this.SpriteColor(index) = mobColor.[index]
-    member this.MemoryAccessCycle = GetMemoryAccessCycle()
+    member this.MemoryAccessCycle = mac
     member this.BadLine = badLine
     member this.BadLinesEnabled = badLinesEnabled
     member this.DisplayState = displayState
