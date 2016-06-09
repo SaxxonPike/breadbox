@@ -49,16 +49,30 @@ type Commodore64SystemPla (config:Commodore64SystemPlaConfiguration) =
     let none = new Commodore64SystemPlaVoidMemory(fun _ -> lastData) :> IMemory
 
     let vicReadTarget address =
-        if (not (readGame())) && (readExRom()) then
-            if (address &&& 0x3000) = 0x3000 then romH else ram
-        else
-            if (address &&& 0x3000) = 0x1000 then char else ram
+        match address &&& 0x3000, readGame(), readExRom() with
+            | 0x3000, false, true -> romH
+            | 0x1000, true, _ -> char
+            | 0x1000, _, false -> char
+            | _ -> ram
 
     let getMode () =
-        (if readLoRam() then 0x8 else 0x0) |||
-        (if readHiRam() then 0x4 else 0x0) |||
-        (if readGame() then 0x2 else 0x0) |||
-        (if readExRom() then 0x1 else 0x0)
+        match readLoRam(), readHiRam(), readGame(), readExRom() with
+            | false, false, false, false -> 0xb0000
+            | false, false, false, true -> 0xb0001
+            | false, false, true, false -> 0xb0010
+            | false, false, true, true -> 0xb0011
+            | false, true, false, false -> 0xb0100
+            | false, true, false, true -> 0xb0101
+            | false, true, true, false -> 0xb0110
+            | false, true, true, true -> 0xb0111
+            | true, false, false, false -> 0xb1000
+            | true, false, false, true -> 0xb1001
+            | true, false, true, false -> 0xb1010
+            | true, false, true, true -> 0xb1011
+            | true, true, false, false -> 0xb1100
+            | true, true, false, true -> 0xb1101
+            | true, true, true, false -> 0xb1110
+            | _ -> 0xb1111
 
     let readTarget address =
         match getMode() with

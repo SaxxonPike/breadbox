@@ -118,8 +118,8 @@ namespace Breadbox.Test.Cpu6502.Integration
             cpu.ClockMultiple(3000000);
 
             // Assert
-            //var dump = ram.Dump();
-            //File.WriteAllBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dump.bin"), dump);
+            var dump = ram.Dump();
+            File.WriteAllBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dump.bin"), dump);
         }
     }
 }
