@@ -665,15 +665,14 @@ type Mos6502(config:Mos6502Configuration) =
     let memoryReadRaw = config.Memory.Read
     let memoryWriteRaw = config.Memory.Write
 
-    let readPort =
-        if config.HasPort then
-            config.Port.ReadPort
-        else
-            fun _ ->
-                0xFF
-
     let read =
         if config.HasPort then
+            let readPort =
+                if config.HasPort then
+                    config.Port.ReadPort
+                else
+                    fun _ ->
+                        0xFF
             fun address ->
                 match address with
                     | 0x00 ->
