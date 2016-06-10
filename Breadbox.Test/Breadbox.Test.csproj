@@ -71,6 +71,7 @@
     <Compile Include="Cpu6502\Opcode\Cpu6502CompareTests.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502OpcodeBaseTestFixture.cs" />
     <Compile Include="Cpu6502\Opcode\Cpu6502SbcTests.cs" />
+    <Compile Include="Mos6567\Mos6567BaseTestFixture.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

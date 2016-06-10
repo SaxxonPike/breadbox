@@ -1,5 +1,7 @@
 ﻿namespace Breadbox
 
+    
+
 type CommodoreVic2Configuration(vBlankSet, cyclesPerRasterLine, rasterLinesPerFrame, clockNumerator, clockDenominator) =
     let rasterWidth = (cyclesPerRasterLine * 8)
     let rasterOffset = ((65 - cyclesPerRasterLine) * 8)
