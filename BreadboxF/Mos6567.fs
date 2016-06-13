@@ -41,6 +41,16 @@ type private BaUop =
     | Sprite7
     | Character
 
+
+
+
+
+
+
+
+
+
+
 type Mos6567 () =
 
     // Interface
@@ -56,18 +66,18 @@ type Mos6567 () =
     let mutable CB = 0x0000
     let mutable ECM = false
     let mutable G = 0x000
+    let MxC = Array.zeroCreate 8
     let mutable MCM = false
-    let MDMA = Array.zeroCreate 8
+    let MDMAx = Array.zeroCreate 8
     let MMC0 = 0x0
     let MMC1 = 0x0
-    let MP = Array.zeroCreate 8
-    let MSR = Array.zeroCreate 8
+    let MPx = Array.zeroCreate 8
+    let MSRx = Array.zeroCreate 8
+    let MxMC = Array.zeroCreate 8
     let mutable RC = 0x0
     let mutable REF = 0x00
     let mutable VC = 0x00
     let mutable VM = 0x0000
-
-
     
     // Timing Information
     let CyclesPerRasterLine = 65
@@ -269,73 +279,129 @@ type Mos6567 () =
         0x3D; 0x15; 0x15; 0x3F;
     |]
 
+
+
+
+
+
+
+
+
+
+
     // Determine fetch address and operation. (address:int, operation:int->unit)
-    let Fetch cycle =
-        match RasterCounterFetch.[cycle], RasterCounterFetchSprite.[cycle] with
-            | FetchUop.Character, _ ->
-                (VM ||| VC), (fun data -> C <- data)
-            | FetchUop.Graphics, _ ->
-                (match (if ECM then 0x39FF else 0x3FFF), BMM with
+    let Fetch ecm bmm vm vc cb c rc ref cycle mdma mp onC onG onR onP onS onI =
+        match RasterCounterFetch.[cycle] with
+            | FetchUop.Idle ->
+                0x3FFF, onI
+            | FetchUop.None ->
+                0x3FFF, ignore
+            | FetchUop.Character ->
+                (vm ||| vc), onC
+            | FetchUop.Graphics ->
+                (match (if ecm then 0x39FF else 0x3FFF), bmm with
                     | mask, false ->
-                        (CB ||| ((C &&& 0xFF) <<< 3) ||| RC) &&& mask
+                        (cb ||| ((c &&& 0xFF) <<< 3) ||| rc) &&& mask
                     | mask, true ->
-                        ((CB &&& 0x2000) ||| (VC <<< 3) ||| RC) &&& mask
-                ), (fun data -> G <- data)
-            | FetchUop.Refresh, _ ->
-                (0x3F00 ||| REF), (fun _ -> REF <- (REF - 1) &&& 0xFF)
-            | FetchUop.SpritePointer, i ->
-                (VM ||| 0x03F8 ||| i), (fun data -> MP.[i] <- data)
-            | FetchUop.SpriteData, i when MDMA.[i] ->
-                (MP.[i]), (fun data -> MSR.[i] <- (MSR.[i] <<< 8) ||| data)
-            | _ ->
-                (0x3FFF), ignore
+                        ((cb &&& 0x2000) ||| (vc <<< 3) ||| rc) &&& mask
+                ), onG
+            | FetchUop.Refresh ->
+                (0x3F00 ||| ref), onR
+            | uop ->
+                match uop, RasterCounterFetchSprite.[cycle] with
+                    | FetchUop.SpritePointer, i ->
+                        (vm ||| 0x03F8 ||| i), (onP i)
+                    | FetchUop.SpriteData, i when (mdma i) ->
+                        (mp i), (onS i)
+                    | _ ->
+                        (0x3FFF), ignore
     
-    // Determine sprite output color and data (color:int, foreground:bool)
-    let SpriteOutput mmc0 mmc1 color multicolor sr =
-        match sr &&& 0xC00000, multicolor with
-            | 0x400000, true -> mmc0, true
-            | 0x800000, _ | 0xC00000, false -> color, true
-            | 0xC00000, true -> mmc1, true
-            | _ -> 0, false
+    // Determine graphics output color and data [000] (color:int, foreground:bool)
+    let GraphicsOutputStandardTextMode b0c color sr =
+        match (sr &&& 0x80) with
+            | 0x80 -> (color >>> 8, true)
+            | _ -> (b0c, false)
+
+    // Determine graphics output color and data [001] (color:int, foreground:bool)
+    let GraphicsOutputMulticolorTextMode b0c b1c b2c color sr =
+        match (sr &&& 0xC0), (color &&& 0x800) <> 0 with
+            | 0x40, true -> (b1c, false)
+            | 0x80, true -> (b2c, true)
+            | 0xC0, true -> ((color >>> 8) &&& 0x7, true)
+            | _ -> (b0c, false)
+
+    // Determine graphics output color and data [010] (color:int, foreground:bool)
+    let GraphicsOutputStandardBitmapMode color sr =
+        match (sr &&& 0x80) with
+            | 0x80 -> ((color >>> 4) &&& 0xF, true)
+            | _ -> (color &&& 0xF, false)
+
+    // Determine graphics output color and data [011] (color:int, foreground:bool)
+    let GraphicsOutputMulticolorBitmapMode b0c color sr =
+        match (sr &&& 0xC0) with
+            | 0x40 -> ((color >>> 4) &&& 0xF, false)
+            | 0x80 -> (color &&& 0xF, true)
+            | 0xC0 -> ((color >>> 8), true)
+            | _ -> (b0c, false)
+
+    // Determine graphics output color and data [100] (color:int, foreground:bool)
+    let GraphicsOutputExtraColorMode b0c b1c b2c b3c color sr =
+        match (sr &&& 0x80), (color &&& 0xC0) with
+            | 0x80, _ -> ((color >>> 8), true)
+            | _, 0x40 -> (b1c, false)
+            | _, 0x80 -> (b2c, false)
+            | _, 0xC0 -> (b3c, false)
+            | _ -> (b0c, false)
+
+    // Determine graphics output color and data [101] (color:int, foreground:bool)
+    let GraphicsOutputInvalidExtraColorMode sr =
+        0, match (sr &&& 0x80) with
+            | 0x80 -> true
+            | _ -> false
 
     // Determine graphics output color and data (color:int, foreground:bool)
     let GraphicsOutput ecm bmm mcm b0c b1c b2c b3c color sr =
         match ecm, bmm, mcm with
-            | false, false, false ->
-                match (sr &&& 0x80) with
-                    | 0x80 -> (color >>> 8), true
-                    | _ -> b0c, false
-            | false, false, true ->
-                match (sr &&& 0xC0), (color &&& 0x800) <> 0 with
-                    | 0x00, _ -> b0c, false
-                    | 0x40, true -> b1c, false
-                    | 0x80, true -> b2c, true
-                    | _ -> (color >>> 8) &&& 0x7, true
-            | false, true, false ->
-                match (sr &&& 0x80) with
-                    | 0x80 -> (color >>> 4) &&& 0xF, true
-                    | _ -> color &&& 0xF, false
-            | false, true, true ->
-                match (sr &&& 0xC0) with
-                    | 0x40 -> (color >>> 4) &&& 0xF, false
-                    | 0x80 -> color &&& 0xF, true
-                    | 0xC0 -> (color >>> 8), true
-                    | _ -> b0c, false
-            | true, false, false ->
-                match (sr &&& 0x80), (color &&& 0xC0) with
-                    | 0x80, _ -> (color >>> 8), true
-                    | _, 0x40 -> b1c, false
-                    | _, 0x80 -> b2c, false
-                    | _, 0xC0 -> b3c, false
-                    | _ -> B0C, false
-            | true, false, true ->
-                match (sr &&& 0xC0), (color &&& 0x800) <> 0 with
-                    | 0x00, _ | 0x40, true -> 0, false
-                    | _ -> 0, true
-            | true, true, _ ->
-                match (sr &&& 0x80) with
-                    | 0x80 -> 0, true
-                    | _ -> 0, false
+            | false, false, false -> GraphicsOutputStandardTextMode b0c color sr
+            | false, false, true -> GraphicsOutputMulticolorTextMode b0c b1c b2c color sr
+            | false, true, false -> GraphicsOutputStandardBitmapMode color sr
+            | false, true, true -> GraphicsOutputMulticolorBitmapMode b0c color sr
+            | true, false, false -> GraphicsOutputExtraColorMode b0c b1c b2c b3c color sr
+            | _ -> GraphicsOutputInvalidExtraColorMode sr
+    
+    // Determine sprite output color and data (color:int, output:bool)
+    let SpriteOutput mmc0 mmc1 color multicolor sr =
+        match sr &&& (if multicolor then 0xC00000 else 0x800000) with
+            | 0x400000 -> mmc0, true
+            | 0x800000 -> color, true
+            | 0xC00000 -> mmc1, true
+            | _ -> 0, false
 
+    // Determine the frontmost sprite (color:int, output:bool, priority:bool)
+    let rec FirstSpriteOutput spriteOutput dataPriority startIndex =
+        match startIndex with
+            | 8 -> (0, false, true)
+            | _ ->
+                match (spriteOutput startIndex) with
+                    | (color, output) when output -> (color, output, dataPriority(startIndex))
+                    | _ -> FirstSpriteOutput spriteOutput dataPriority (startIndex + 1)
 
-        
+    // Determine muxed graphics output color (color:int)
+    let MuxOutput graphicsOutput spriteOutput dataPriority =
+        match graphicsOutput, FirstSpriteOutput spriteOutput dataPriority 0 with
+            | (gColor, true), (_, _, true) | (gColor, _), (_, false, _) ->
+                // Either sprite is inactive or its data priority is 1
+                gColor
+            | _, (sColor, _, _) ->
+                // Sprite is active
+                sColor
+                
+    // Determine border unit output (color:int, output:bool)
+    let BorderUnitOutput ec mainBorder verticalBorder =
+        match mainBorder, verticalBorder with
+            | true, _ | _, true -> (ec, true)
+            | _ -> (0, false)
+    
+//    // Determine combined video output (color:int)
+//    let VideoOutput ecm bmm mcm b0c b1c b2c b3c gc gsr mmc0 mmc1 sc smc ssr ssre ec mborder vborder =
+//        match 
