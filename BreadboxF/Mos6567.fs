@@ -41,6 +41,57 @@ type private BaUop =
     | Sprite7
     | Character
 
+type private GraphicsOutput = {
+    Color:int;
+    Foreground:bool;
+}
+
+type private GraphicsState = {
+    ECM:bool;
+    BMM:bool;
+    VM:int;
+    VC:int;
+    CB:int;
+    C:int;
+    RC:int;
+    SR:int;
+}
+
+type private SpriteState = {
+    X:int;
+    Y:int;
+    E:bool;
+    YE:bool;
+    YET:bool;
+    DP:bool;
+    MC:bool;
+    MCT:bool;
+    XE:bool;
+    DMA:bool;
+    DISP:bool;
+}
+
+type private ColorState = {
+    MMC0:int;
+    MMC1:int;
+    EC:int;
+    B0C:int;
+    B1C:int;
+    B2C:int;
+    B3C:int;
+}
+
+type private SpriteOutput = {
+    Color:int;
+    Output:bool;
+}
+
+type private BorderOutput = {
+    Color:int;
+    Output:bool;
+}
+
+
 
 
 
@@ -317,91 +368,74 @@ type Mos6567 () =
                         (0x3FFF), ignore
     
     // Determine graphics output color and data [000] (color:int, foreground:bool)
-    let GraphicsOutputStandardTextMode b0c color sr =
+    let RawGraphicsOutputStandardTextMode b0c color sr =
         match (sr &&& 0x80) with
             | 0x80 -> (color >>> 8, true)
-            | _ -> (b0c, false)
+            | _    -> (b0c, false)
 
     // Determine graphics output color and data [001] (color:int, foreground:bool)
-    let GraphicsOutputMulticolorTextMode b0c b1c b2c color sr =
+    let RawGraphicsOutputMulticolorTextMode b0c b1c b2c color sr =
         match (sr &&& 0xC0), (color &&& 0x800) <> 0 with
-            | 0x40, true -> (b1c, false)
-            | 0x80, true -> (b2c, true)
-            | 0xC0, true -> ((color >>> 8) &&& 0x7, true)
-            | _ -> (b0c, false)
+            | 0x40         , true                     -> (b1c, false)
+            | 0x80         , true                     -> (b2c, true)
+            | 0xC0         , true                     -> ((color >>> 8) &&& 0x7, true)
+            | _                                       -> (b0c, false)
 
     // Determine graphics output color and data [010] (color:int, foreground:bool)
-    let GraphicsOutputStandardBitmapMode color sr =
+    let RawGraphicsOutputStandardBitmapMode color sr =
         match (sr &&& 0x80) with
-            | 0x80 -> ((color >>> 4) &&& 0xF, true)
-            | _ -> (color &&& 0xF, false)
+            | 0x80            -> ((color >>> 4) &&& 0xF, true)
+            | _               -> (color &&& 0xF, false)
 
     // Determine graphics output color and data [011] (color:int, foreground:bool)
-    let GraphicsOutputMulticolorBitmapMode b0c color sr =
+    let RawGraphicsOutputMulticolorBitmapMode b0c color sr =
         match (sr &&& 0xC0) with
-            | 0x40 -> ((color >>> 4) &&& 0xF, false)
-            | 0x80 -> (color &&& 0xF, true)
-            | 0xC0 -> ((color >>> 8), true)
-            | _ -> (b0c, false)
+            | 0x40            -> ((color >>> 4) &&& 0xF, false)
+            | 0x80            -> (color &&& 0xF, true)
+            | 0xC0            -> ((color >>> 8), true)
+            | _               -> (b0c, false)
 
     // Determine graphics output color and data [100] (color:int, foreground:bool)
-    let GraphicsOutputExtraColorMode b0c b1c b2c b3c color sr =
+    let RawGraphicsOutputExtraColorMode b0c b1c b2c b3c color sr =
         match (sr &&& 0x80), (color &&& 0xC0) with
-            | 0x80, _ -> ((color >>> 8), true)
-            | _, 0x40 -> (b1c, false)
-            | _, 0x80 -> (b2c, false)
-            | _, 0xC0 -> (b3c, false)
-            | _ -> (b0c, false)
+            | 0x80         , _                  -> ((color >>> 8), true)
+            | _            , 0x40               -> (b1c, false)
+            | _            , 0x80               -> (b2c, false)
+            | _            , 0xC0               -> (b3c, false)
+            | _                                 -> (b0c, false)
 
     // Determine graphics output color and data [101] (color:int, foreground:bool)
-    let GraphicsOutputInvalidExtraColorMode sr =
-        0, match (sr &&& 0x80) with
-            | 0x80 -> true
-            | _ -> false
+    let RawGraphicsOutputInvalidExtraColorMode sr =
+        match (sr &&& 0x80) with
+            | 0x80            -> (0, true)
+            | _               -> (0, false)
 
     // Determine graphics output color and data (color:int, foreground:bool)
-    let GraphicsOutput ecm bmm mcm b0c b1c b2c b3c color sr =
-        match ecm, bmm, mcm with
-            | false, false, false -> GraphicsOutputStandardTextMode b0c color sr
-            | false, false, true -> GraphicsOutputMulticolorTextMode b0c b1c b2c color sr
-            | false, true, false -> GraphicsOutputStandardBitmapMode color sr
-            | false, true, true -> GraphicsOutputMulticolorBitmapMode b0c color sr
-            | true, false, false -> GraphicsOutputExtraColorMode b0c b1c b2c b3c color sr
-            | _ -> GraphicsOutputInvalidExtraColorMode sr
-    
-    // Determine sprite output color and data (color:int, output:bool)
-    let SpriteOutput mmc0 mmc1 color multicolor sr =
-        match sr &&& (if multicolor then 0xC00000 else 0x800000) with
-            | 0x400000 -> mmc0, true
-            | 0x800000 -> color, true
-            | 0xC00000 -> mmc1, true
-            | _ -> 0, false
+    let RawGraphicsOutput ecm bmm mcm b0c b1c b2c b3c color sr =
+        match ecm,   bmm,   mcm   with
+            | false, false, false   -> RawGraphicsOutputStandardTextMode b0c color sr
+            | false, false, true    -> RawGraphicsOutputMulticolorTextMode b0c b1c b2c color sr
+            | false, true,  false   -> RawGraphicsOutputStandardBitmapMode color sr
+            | false, true,  true    -> RawGraphicsOutputMulticolorBitmapMode b0c color sr
+            | true,  false, false   -> RawGraphicsOutputExtraColorMode b0c b1c b2c b3c color sr
+            | _                     -> RawGraphicsOutputInvalidExtraColorMode sr
 
-    // Determine the frontmost sprite (color:int, output:bool, priority:bool)
-    let rec FirstSpriteOutput spriteOutput dataPriority startIndex =
-        match startIndex with
-            | 8 -> (0, false, true)
-            | _ ->
-                match (spriteOutput startIndex) with
-                    | (color, output) when output -> (color, output, dataPriority(startIndex))
-                    | _ -> FirstSpriteOutput spriteOutput dataPriority (startIndex + 1)
+    // Determine sprite output color and data (color:int, output:bool, priority:bool)
+    let RawSpriteOutput mmc0 mmc1 color multicolor sr dp =
+        match sr &&& 0x800000, multicolor, sr &&& 0xC00000 with
+            | 0x800000       , false     , _
+            | _              , true      , 0x800000          -> color, true, dp
+            | _              , true      , 0x400000          -> mmc0, true, dp
+            | _              , true      , 0xC00000          -> mmc1, true, dp
+            | _                                              -> 0, false, dp
 
-    // Determine muxed graphics output color (color:int)
-    let MuxOutput graphicsOutput spriteOutput dataPriority =
-        match graphicsOutput, FirstSpriteOutput spriteOutput dataPriority 0 with
-            | (gColor, true), (_, _, true) | (gColor, _), (_, false, _) ->
-                // Either sprite is inactive or its data priority is 1
-                gColor
-            | _, (sColor, _, _) ->
-                // Sprite is active
-                sColor
-                
-    // Determine border unit output (color:int, output:bool)
-    let BorderUnitOutput ec mainBorder verticalBorder =
-        match mainBorder, verticalBorder with
-            | true, _ | _, true -> (ec, true)
-            | _ -> (0, false)
+    // Determine border output color and data (color:int, output:bool)
+    let RawBorderOutput ec mborder vborder =
+        match mborder, vborder with
+            | true   , _
+            | _      , true      -> ec, true
+            | _                  -> 0, false
+
+    // Pipeline:
+    // Mob0 >> Mob1 >> Mob2 >> Mob3 >> Mob4 >> Mob5 >> Mob6 >> Mob7 >> Graphics >> Border
     
-//    // Determine combined video output (color:int)
-//    let VideoOutput ecm bmm mcm b0c b1c b2c b3c gc gsr mmc0 mmc1 sc smc ssr ssre ec mborder vborder =
-//        match 
