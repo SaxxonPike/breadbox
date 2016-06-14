@@ -436,6 +436,46 @@ type Mos6567 () =
             | _      , true      -> ec, true
             | _                  -> 0, false
 
-    // Pipeline:
-    // Mob0 >> Mob1 >> Mob2 >> Mob3 >> Mob4 >> Mob5 >> Mob6 >> Mob7 >> Graphics >> Border
+    // Determine which sprites are outputting (register:int)
+    let RawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7 =
+        (match s0 with | (_, true, _) -> 0x01 | _ -> 0x00) |||
+        (match s1 with | (_, true, _) -> 0x02 | _ -> 0x00) |||
+        (match s2 with | (_, true, _) -> 0x04 | _ -> 0x00) |||
+        (match s3 with | (_, true, _) -> 0x08 | _ -> 0x00) |||
+        (match s4 with | (_, true, _) -> 0x10 | _ -> 0x00) |||
+        (match s5 with | (_, true, _) -> 0x20 | _ -> 0x00) |||
+        (match s6 with | (_, true, _) -> 0x40 | _ -> 0x00) |||
+        (match s7 with | (_, true, _) -> 0x80 | _ -> 0x00)
+
+    // Determine frontmost sprite to render (color:int, output:bool, priority:bool)
+    let MuxSpritesForground s0 s1 s2 s3 s4 s5 s6 s7 =
+        match s0, s1, s2, s3, s4, s5, s6, s7 with
+            | (_, true, _), _, _, _, _, _, _, _ -> s0
+            | _, (_, true, _), _, _, _, _, _, _ -> s1
+            | _, _, (_, true, _), _, _, _, _, _ -> s2
+            | _, _, _, (_, true, _), _, _, _, _ -> s3
+            | _, _, _, _, (_, true, _), _, _, _ -> s4
+            | _, _, _, _, _, (_, true, _), _, _ -> s5
+            | _, _, _, _, _, _, (_, true, _), _ -> s6
+            | _, _, _, _, _, _, _, (_, true, _) -> s7
+            | _                                 -> (0, false, true)
+
+    // Determine sprite-sprite collision register result (register:int)
+    let MuxSpritesSpriteCollision rawmux =
+        match rawmux with
+            | 0x00 | 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 | 0x40 | 0x80 -> 0x00
+            | _ -> rawmux
+
+    // Determine sprite-data collision register result (register:int)
+    let MuxSpriteBackgroundCollision g rawmux =
+        match g with
+            | (_, false) -> 0x00
+            | _ -> rawmux
     
+    // Determine output sprite color, data, priority and collision (color:int, output:bool, priority:bool, spriteCollisions:int, dataCollisions:int)
+    let MuxSprites graphicsOutput spriteOutput =
+        match (spriteOutput 0), (spriteOutput 1), (spriteOutput 2), (spriteOutput 3), (spriteOutput 4), (spriteOutput 5), (spriteOutput 6), (spriteOutput 7) with
+            | s0, s1, s2, s3, s4, s5, s6, s7 ->
+                match MuxSpritesForground s0 s1 s2 s3 s4 s5 s6 s7, RawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7 with
+                    | (color, output, priority), rawmux ->
+                        (color, output, priority, MuxSpritesSpriteCollision rawmux, MuxSpriteBackgroundCollision graphicsOutput rawmux) 
