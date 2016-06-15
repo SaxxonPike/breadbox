@@ -479,3 +479,22 @@ type Mos6567 () =
                 match MuxSpritesForground s0 s1 s2 s3 s4 s5 s6 s7, RawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7 with
                     | (color, output, priority), rawmux ->
                         (color, output, priority, MuxSpritesSpriteCollision rawmux, MuxSpriteBackgroundCollision graphicsOutput rawmux) 
+
+    // Determine graphics unit output (color:int, spriteCollisions:int, dataCollisions:int)
+    let Mux spriteOutput ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
+        match vborder with
+            | true -> ec, 0x00, 0x00
+            | _ ->
+                match RawGraphicsOutput ecm bmm mcm b0c b1c b2c b3c gc gsr with
+                    | (graphicsColor, graphicsForeground) ->
+                        match MuxSprites (graphicsColor, graphicsForeground) spriteOutput with
+                            | (spriteColor, spriteData, spritePriority, spriteSpriteCollisions, spriteDataCollisions) ->
+                                match graphicsForeground, spriteData, spritePriority with
+                                    | _, false, _ | true, _, true -> (graphicsColor, spriteSpriteCollisions, spriteDataCollisions)
+                                    | _ -> (spriteColor, spriteSpriteCollisions, spriteDataCollisions)
+
+    // Determine video output (color:int, spriteCollisions:int, dataCollisions:int)
+    let Output spriteOutput ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
+        match mborder, Mux spriteOutput ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr with
+            | true, (_, spriteSpriteCollisions, spriteDataCollisions) -> (ec, spriteSpriteCollisions, spriteDataCollisions)
+            | _, (color, spriteSpriteCollisions, spriteDataCollisions) -> (color, spriteSpriteCollisions, spriteDataCollisions)
