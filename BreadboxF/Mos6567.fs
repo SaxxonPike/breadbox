@@ -41,55 +41,10 @@ type private BaUop =
     | Sprite7
     | Character
 
-type private GraphicsOutput = {
-    Color:int;
-    Foreground:bool;
-}
-
-type private GraphicsState = {
-    ECM:bool;
-    BMM:bool;
-    VM:int;
-    VC:int;
-    CB:int;
-    C:int;
-    RC:int;
-    SR:int;
-}
-
-type private SpriteState = {
-    X:int;
-    Y:int;
-    E:bool;
-    YE:bool;
-    YET:bool;
-    DP:bool;
-    MC:bool;
-    MCT:bool;
-    XE:bool;
-    DMA:bool;
-    DISP:bool;
-}
-
-type private ColorState = {
-    MMC0:int;
-    MMC1:int;
-    EC:int;
-    B0C:int;
-    B1C:int;
-    B2C:int;
-    B3C:int;
-}
-
-type private SpriteOutput = {
-    Color:int;
-    Output:bool;
-}
-
-type private BorderOutput = {
-    Color:int;
-    Output:bool;
-}
+type Mos6567Configuration (cyclesPerRasterLine, rasterLinesPerFrame) =
+    member val CyclesPerRasterLine = cyclesPerRasterLine
+    member val RasterLinesPerFrame = rasterLinesPerFrame
+    member val PixelsPerRasterLine = cyclesPerRasterLine * 8
 
 
 
@@ -102,38 +57,15 @@ type private BorderOutput = {
 
 
 
-type Mos6567 () =
+type Mos6567Chip (config:Mos6567Configuration) =
 
     // Interface
     let ReadMemory address:int = 0
     
-    // Registers
-    let mutable B0C = 0x0
-    let mutable B1C = 0x0
-    let mutable B2C = 0x0
-    let mutable B3C = 0x0
-    let mutable BMM = false
-    let mutable C = 0x000
-    let mutable CB = 0x0000
-    let mutable ECM = false
-    let mutable G = 0x000
-    let MxC = Array.zeroCreate 8
-    let mutable MCM = false
-    let MDMAx = Array.zeroCreate 8
-    let MMC0 = 0x0
-    let MMC1 = 0x0
-    let MPx = Array.zeroCreate 8
-    let MSRx = Array.zeroCreate 8
-    let MxMC = Array.zeroCreate 8
-    let mutable RC = 0x0
-    let mutable REF = 0x00
-    let mutable VC = 0x00
-    let mutable VM = 0x0000
-    
     // Timing Information
-    let CyclesPerRasterLine = 65
-    let RasterLinesPerFrame = 263
-    let PixelsPerRasterLine = CyclesPerRasterLine * 8
+    let CyclesPerRasterLine = config.CyclesPerRasterLine
+    let RasterLinesPerFrame = config.RasterLinesPerFrame
+    let PixelsPerRasterLine = config.PixelsPerRasterLine
 
     // Determines phase transitions based on raster counter
     let IsFirstPhaseEdge x =
@@ -338,34 +270,40 @@ type Mos6567 () =
 
 
 
+    // Determine I fetch address.
+    let FetchIAddress =
+        0x3FFF
 
+    // Determine P fetch address. VM must be pre-shifted.
+    let FetchPAddress vm index =
+        vm ||| 0x03F8 ||| index
 
-    // Determine fetch address and operation. (address:int, operation:int->unit)
-    let Fetch ecm bmm vm vc cb c rc ref cycle mdma mp onC onG onR onP onS onI =
+    // Determine S fetch address. MP must be pre-shifted.
+    let FetchSAddress mp mc =
+        mc ||| mp
+
+    // Determine R fetch address. REF must be pre-truncated.
+    let FetchRAddress ref =
+        0x3F00 ||| ref
+
+    // Determine G fetch address. CB must be pre-shifted.
+    let FetchGAddress idle ecm bmm vc cb c rc =
+        (if idle then 0x3FFF elif bmm then ((cb &&& 0x2000) ||| (vc <<< 3) ||| rc) else (cb ||| ((c &&& 0xFF) <<< 3) ||| rc)) &&& (if ecm then 0x39FF else 0x3FFF)
+
+    // Determine C fetch address. VM must be pre-shifted.
+    let FetchCAddress vm vc =
+        (vm ||| vc)
+    
+    // Determine fetch operation. (operation:int, index:int)
+    let Fetch cycle =
         match RasterCounterFetch.[cycle] with
-            | FetchUop.Idle ->
-                0x3FFF, onI
-            | FetchUop.None ->
-                0x3FFF, ignore
-            | FetchUop.Character ->
-                (vm ||| vc), onC
-            | FetchUop.Graphics ->
-                (match (if ecm then 0x39FF else 0x3FFF), bmm with
-                    | mask, false ->
-                        (cb ||| ((c &&& 0xFF) <<< 3) ||| rc) &&& mask
-                    | mask, true ->
-                        ((cb &&& 0x2000) ||| (vc <<< 3) ||| rc) &&& mask
-                ), onG
-            | FetchUop.Refresh ->
-                (0x3F00 ||| ref), onR
-            | uop ->
-                match uop, RasterCounterFetchSprite.[cycle] with
-                    | FetchUop.SpritePointer, i ->
-                        (vm ||| 0x03F8 ||| i), (onP i)
-                    | FetchUop.SpriteData, i when (mdma i) ->
-                        (mp i), (onS i)
-                    | _ ->
-                        (0x3FFF), ignore
+            | FetchUop.None           -> FetchUop.None, 0
+            | FetchUop.Idle           -> FetchUop.Idle, 0
+            | FetchUop.Graphics       -> FetchUop.Graphics, 0
+            | FetchUop.Character      -> FetchUop.Character, 0
+            | FetchUop.SpriteData     -> FetchUop.SpriteData, RasterCounterFetchSprite.[cycle]
+            | FetchUop.SpritePointer  -> FetchUop.SpritePointer, RasterCounterFetchSprite.[cycle]
+            | FetchUop.Refresh        -> FetchUop.Refresh, 0
     
     // Determine graphics output color and data [000] (color:int, foreground:bool)
     let RawGraphicsOutputStandardTextMode b0c color sr =
@@ -378,7 +316,8 @@ type Mos6567 () =
         match (sr &&& 0xC0), (color &&& 0x800) <> 0 with
             | 0x40         , true                     -> (b1c, false)
             | 0x80         , true                     -> (b2c, true)
-            | 0xC0         , true                     -> ((color >>> 8) &&& 0x7, true)
+            | 0x80         , _
+            | 0xC0         , _                        -> ((color >>> 8) &&& 0x7, true)
             | _                                       -> (b0c, false)
 
     // Determine graphics output color and data [010] (color:int, foreground:bool)
@@ -421,13 +360,16 @@ type Mos6567 () =
             | _                     -> RawGraphicsOutputInvalidExtraColorMode sr
 
     // Determine sprite output color and data (color:int, output:bool, priority:bool)
-    let RawSpriteOutput mmc0 mmc1 color multicolor sr dp =
-        match sr &&& 0x800000, multicolor, sr &&& 0xC00000 with
-            | 0x800000       , false     , _
-            | _              , true      , 0x800000          -> color, true, dp
-            | _              , true      , 0x400000          -> mmc0, true, dp
-            | _              , true      , 0xC00000          -> mmc1, true, dp
-            | _                                              -> 0, false, dp
+    let RawSpriteOutput mmc0 mmc1 color multicolor sr dp disp =
+        match disp with
+            | false -> 0, false, dp
+            | _ ->
+                match sr &&& 0x800000, multicolor, sr &&& 0xC00000 with
+                    | 0x800000       , false     , _
+                    | _              , true      , 0x800000          -> color, true, dp
+                    | _              , true      , 0x400000          -> mmc0, true, dp
+                    | _              , true      , 0xC00000          -> mmc1, true, dp
+                    | _                                              -> 0, false, dp
 
     // Determine border output color and data (color:int, output:bool)
     let RawBorderOutput ec mborder vborder =
@@ -447,8 +389,40 @@ type Mos6567 () =
         (match s6 with | (_, true, _) -> 0x40 | _ -> 0x00) |||
         (match s7 with | (_, true, _) -> 0x80 | _ -> 0x00)
 
+    // Determine shifted graphics state (mcToggle:bool, sr:int)
+    let ClockedGraphics bmm mcm mct c sr =
+        match bmm, mcm, mct, (c &&& 0x800 <> 0) with
+            | false, true, _, false
+            | _, false, _, _ -> true, sr <<< 1
+            | _, _, true, _ -> false, sr
+            | _, _, false, _ -> true, sr <<< 2
+
+    // Determine shifted sprite state (srEnabled:bool, mcToggle:bool, xeToggle:bool, sr:int)
+    let ClockedSprite rasterx x sre disp sr mc mct xe xet =
+        match disp, sre || (rasterx = x), mc, xe, mct, xet with
+            | false, _    , _    , _    , _    , _
+            | _    , false, _    , _    , _    , _     -> false, true, true, sr
+            | _    , _    , false, false, _    , _
+            | _    , _    , false, true , _    , false -> true, true, true, sr <<< 1
+            | _    , _    , true , false, false, _
+            | _    , _    , true , true , false, false -> true, true, true, sr <<< 2
+            | _    , _    , false, true , _    , true
+            | _    , _    , true , true , false, true  -> true, true, false, sr
+            | _    , _    , true , false, true , _
+            | _    , _    , true , true , true , true  -> true, false, true, sr
+            | _    , _    , true , true , true , false -> true, false, false, sr
+
+    // Determine clocked raster position. (counterX:int, rasterY:int, rasterX:int)
+    let ClockedRaster rasterCounter rasterY =
+        match (rasterCounter + 1) with
+            | newCounter when newCounter >= PixelsPerRasterLine ->
+                match (rasterY + 1) with
+                    | newRasterY when newRasterY >= RasterLinesPerFrame -> 0, 0, 0
+                    | newRasterY -> 0, newRasterY, 0
+            | newCounter -> newCounter, rasterY, RasterCounterX.[newCounter]
+
     // Determine frontmost sprite to render (color:int, output:bool, priority:bool)
-    let MuxSpritesForground s0 s1 s2 s3 s4 s5 s6 s7 =
+    let MuxSpritesForeground s0 s1 s2 s3 s4 s5 s6 s7 =
         match s0, s1, s2, s3, s4, s5, s6, s7 with
             | (_, true, _), _, _, _, _, _, _, _ -> s0
             | _, (_, true, _), _, _, _, _, _, _ -> s1
@@ -461,7 +435,7 @@ type Mos6567 () =
             | _                                 -> (0, false, true)
 
     // Determine sprite-sprite collision register result (register:int)
-    let MuxSpritesSpriteCollision rawmux =
+    let MuxSpriteSpriteCollision rawmux =
         match rawmux with
             | 0x00 | 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 | 0x40 | 0x80 -> 0x00
             | _ -> rawmux
@@ -473,28 +447,54 @@ type Mos6567 () =
             | _ -> rawmux
     
     // Determine output sprite color, data, priority and collision (color:int, output:bool, priority:bool, spriteCollisions:int, dataCollisions:int)
-    let MuxSprites graphicsOutput spriteOutput =
-        match (spriteOutput 0), (spriteOutput 1), (spriteOutput 2), (spriteOutput 3), (spriteOutput 4), (spriteOutput 5), (spriteOutput 6), (spriteOutput 7) with
-            | s0, s1, s2, s3, s4, s5, s6, s7 ->
-                match MuxSpritesForground s0 s1 s2 s3 s4 s5 s6 s7, RawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7 with
-                    | (color, output, priority), rawmux ->
-                        (color, output, priority, MuxSpritesSpriteCollision rawmux, MuxSpriteBackgroundCollision graphicsOutput rawmux) 
+    let MuxSprites graphicsOutput s0 s1 s2 s3 s4 s5 s6 s7 =
+        match MuxSpritesForeground s0 s1 s2 s3 s4 s5 s6 s7, RawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7 with
+            | (color, output, priority), rawmux ->
+                (color, output, priority, MuxSpriteSpriteCollision rawmux, MuxSpriteBackgroundCollision graphicsOutput rawmux) 
 
     // Determine graphics unit output (color:int, spriteCollisions:int, dataCollisions:int)
-    let Mux spriteOutput ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
+    let Mux s0 s1 s2 s3 s4 s5 s6 s7 ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
         match vborder with
             | true -> ec, 0x00, 0x00
             | _ ->
                 match RawGraphicsOutput ecm bmm mcm b0c b1c b2c b3c gc gsr with
                     | (graphicsColor, graphicsForeground) ->
-                        match MuxSprites (graphicsColor, graphicsForeground) spriteOutput with
+                        match MuxSprites (graphicsColor, graphicsForeground) s0 s1 s2 s3 s4 s5 s6 s7 with
                             | (spriteColor, spriteData, spritePriority, spriteSpriteCollisions, spriteDataCollisions) ->
                                 match graphicsForeground, spriteData, spritePriority with
                                     | _, false, _ | true, _, true -> (graphicsColor, spriteSpriteCollisions, spriteDataCollisions)
                                     | _ -> (spriteColor, spriteSpriteCollisions, spriteDataCollisions)
 
     // Determine video output (color:int, spriteCollisions:int, dataCollisions:int)
-    let Output spriteOutput ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
-        match mborder, Mux spriteOutput ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr with
+    let Output s0 s1 s2 s3 s4 s5 s6 s7 ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
+        match mborder, Mux s0 s1 s2 s3 s4 s5 s6 s7 ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr with
             | true, (_, spriteSpriteCollisions, spriteDataCollisions) -> (ec, spriteSpriteCollisions, spriteDataCollisions)
             | _, (color, spriteSpriteCollisions, spriteDataCollisions) -> (color, spriteSpriteCollisions, spriteDataCollisions)
+
+
+    member this.TestFetchIAddress () = FetchIAddress
+    member this.TestFetchRAddress ref = FetchRAddress ref
+    member this.TestFetchGAddress ecm bmm vc cb c rc = FetchGAddress ecm bmm vc cb c rc
+    member this.TestFetchCAddress vm vc = FetchCAddress vm vc
+    member this.TestFetchPAddress vm index = FetchPAddress vm index
+    member this.TestFetchSAddress mp mc = FetchSAddress mp mc
+
+    member this.TestRawGraphicsOutputStandardTextMode b0c color sr = RawGraphicsOutputStandardTextMode b0c color sr
+    member this.TestRawGraphicsOutputMulticolorTextMode b0c b1c b2c color sr = RawGraphicsOutputMulticolorTextMode b0c b1c b2c color sr
+    member this.TestRawGraphicsOutputStandardBitmapMode color sr = RawGraphicsOutputStandardBitmapMode color sr
+    member this.TestRawGraphicsOutputMulticolorBitmapMode b0c color sr = RawGraphicsOutputMulticolorBitmapMode b0c color sr
+    member this.TestRawGraphicsOutputExtraColorMode b0c b1c b2c b3c color sr = RawGraphicsOutputExtraColorMode b0c b1c b2c b3c color sr
+    member this.TestRawGraphicsOutputInvalidExtraColorMode sr = RawGraphicsOutputInvalidExtraColorMode sr
+
+    member this.TestRawSpriteOutput mmc0 mmc1 color multicolor sr dp disp = RawSpriteOutput mmc0 mmc1 color multicolor sr dp disp
+    member this.TestRawBorderOutput ec mborder vborder = RawBorderOutput ec mborder vborder
+    member this.TestRawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7 = RawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7
+    member this.TestClockedGraphics bmm mcm mct c sr = ClockedGraphics bmm mcm mct c sr
+    member this.TestClockedSprite rasterx x sre disp sr mc mct xe xet = ClockedSprite rasterx x sre disp sr mc mct xe xet
+    member this.TestMuxSpritesForeground s0 s1 s2 s3 s4 s5 s6 s7 = MuxSpritesForeground s0 s1 s2 s3 s4 s5 s6 s7
+    member this.TestMuxSpriteSpriteCollision rawmux = MuxSpriteSpriteCollision rawmux
+    member this.TestMuxSpriteBackgroundCollision g rawmux = MuxSpriteBackgroundCollision g rawmux
+    member this.TestMuxSprites graphicsOutput s0 s1 s2 s3 s4 s5 s6 s7 = MuxSprites graphicsOutput s0 s1 s2 s3 s4 s5 s6 s7
+    member this.TestMux s0 s1 s2 s3 s4 s5 s6 s7 ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr = Mux s0 s1 s2 s3 s4 s5 s6 s7 ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr
+    member this.TestOutput s0 s1 s2 s3 s4 s5 s6 s7 ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr = Output s0 s1 s2 s3 s4 s5 s6 s7 ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr
+    member this.TestClockedRaster rasterCounter rasterY = ClockedRaster rasterCounter rasterY

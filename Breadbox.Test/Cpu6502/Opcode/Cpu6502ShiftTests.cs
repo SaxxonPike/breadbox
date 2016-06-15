@@ -29,7 +29,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("ASL {0:x2} should = {1:x2} with Carry {2}", operand, expectedResult, expectedCarry);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
@@ -54,7 +53,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("ASL A [{0:x2}] should = {1:x2} with Carry {2}", a, expectedResult, expectedCarry);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
@@ -81,7 +79,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("LSR {0:x2} should = {1:x2} with Carry {2}", operand, expectedResult, expectedCarry);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
@@ -106,7 +103,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("LSR A [{0:x2}] should = {1:x2} with Carry {2}", a, expectedResult, expectedCarry);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
@@ -135,7 +131,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("ROL {0:x2} should = {1:x2} with Carry {2}", operand, expectedResult, expectedCarry);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
@@ -161,7 +156,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("ROL A [{0:x2}] should = {1:x2} with Carry {2}", a, expectedResult, expectedCarry);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
@@ -190,7 +184,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("ROR {0:x2} should = {1:x2} with Carry {2}", operand, expectedResult, expectedCarry);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
@@ -216,7 +209,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("ROR A [{0:x2}] should = {1:x2} with Carry {2}", a, expectedResult, expectedCarry);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");

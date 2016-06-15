@@ -12,8 +12,6 @@ namespace Breadbox.Test.Cpu6502
     public abstract class Cpu6502BaseTestFixture
     {
         private Mos6502Configuration _config;
-        private Stopwatch _stopwatch;
-
         protected Mock<IMemory> MemoryMock;
         protected Mock<IReadySignal> ReadySignalMock;
         protected Mos6502 Cpu { get; private set; }
@@ -28,15 +26,6 @@ namespace Breadbox.Test.Cpu6502
 
             _config = new Mos6502Configuration(0xFF, true, null, memory, ready);
             Cpu = new Mos6502(_config);
-            _stopwatch = new Stopwatch();
-            _stopwatch.Start();
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _stopwatch.Stop();
-            Console.WriteLine("Elapsed time: {0}ms", _stopwatch.ElapsedMilliseconds);
         }
 
         protected virtual Mos6502Configuration Config

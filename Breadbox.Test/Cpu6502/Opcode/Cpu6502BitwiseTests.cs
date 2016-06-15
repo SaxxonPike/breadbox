@@ -28,7 +28,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("{0:x2} & {1:x2} should = {2:x2}", a, operand, expectedResult);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
@@ -56,7 +55,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("{0:x2} ^ {1:x2} should = {2:x2}", a, operand, expectedResult);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");
@@ -84,7 +82,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("{0:x2} | {1:x2} should = {2:x2}", a, operand, expectedResult);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must not be modified");

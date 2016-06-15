@@ -32,7 +32,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("{0:x2} + {1:x2} with carry {2} should = {3:x2}", a, operand, carry, expectedResult);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must be set correctly");
@@ -71,7 +70,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("{0:x2} + {1:x2} with carry {2} should = {3:x2}", a, operand, carry, expectedResult);
 
             // Assert
             Cpu.V.Should().Be(expectedOverflow, "V must be set correctly");

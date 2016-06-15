@@ -26,7 +26,6 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("DEC {0:x2} should = {1:x2}", operand, expectedResult);
 
             // Assert
             Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
@@ -47,11 +46,11 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("X={0:x2}; DEX should = {1:x2}", x, expectedResult);
 
             // Assert
             Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
             Cpu.N.Should().Be(expectedSign, "N must be set correctly");
+            Cpu.X.Should().Be(expectedResult, "X must be set correctly");
         }
 
         [Test]
@@ -68,11 +67,11 @@ namespace Breadbox.Test.Cpu6502.Opcode
 
             // Act
             Cpu.ClockStep();
-            Console.WriteLine("Y={0:x2}; DEY should = {1:x2}", y, expectedResult);
 
             // Assert
             Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
             Cpu.N.Should().Be(expectedSign, "N must be set correctly");
+            Cpu.Y.Should().Be(expectedResult, "Y must be set correctly");
         }
     }
 }

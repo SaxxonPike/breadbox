@@ -9,7 +9,6 @@ namespace Breadbox.Test.Vic2
     public abstract class Vic2BaseTestFixture
     {
         private CommodoreVic2Configuration _config;
-        private Stopwatch _stopwatch;
 
         protected Mock<IClock> ClockMockPhi1;
         protected Mock<IClock> ClockMockPhi2;
@@ -27,15 +26,6 @@ namespace Breadbox.Test.Vic2
             var clockPhi2 = ClockMockPhi2 != null ? ClockMockPhi2.Object : new ClockNull();
 
             Vic = new CommodoreVic2Chip(_config, memory, clockPhi1, clockPhi2);
-            _stopwatch = new Stopwatch();
-            _stopwatch.Start();
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _stopwatch.Stop();
-            Console.WriteLine("Elapsed time: {0}ms", _stopwatch.ElapsedMilliseconds);
         }
 
         protected abstract CommodoreVic2Configuration Config { get; }
