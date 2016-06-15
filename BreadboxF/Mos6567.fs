@@ -474,7 +474,7 @@ type Mos6567Chip (config:Mos6567Configuration) =
 
     member this.TestFetchIAddress () = FetchIAddress
     member this.TestFetchRAddress ref = FetchRAddress ref
-    member this.TestFetchGAddress ecm bmm vc cb c rc = FetchGAddress ecm bmm vc cb c rc
+    member this.TestFetchGAddress idle ecm bmm vc cb c rc = FetchGAddress idle ecm bmm vc cb c rc
     member this.TestFetchCAddress vm vc = FetchCAddress vm vc
     member this.TestFetchPAddress vm index = FetchPAddress vm index
     member this.TestFetchSAddress mp mc = FetchSAddress mp mc
