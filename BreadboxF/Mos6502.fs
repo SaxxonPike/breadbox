@@ -1,5 +1,8 @@
 ﻿namespace Breadbox
 
+// 6502/6510 core.
+// Ported from Bizhawk's C# core.
+
 type private Uop =
     | Fetch1
     | Fetch1Real
