@@ -391,11 +391,11 @@ type Mos6567Chip (config:Mos6567Configuration) =
 
     // Determine shifted graphics state (mcToggle:bool, sr:int)
     let ClockedGraphics bmm mcm mct c sr =
-        match bmm, mcm, mct, (c &&& 0x800 <> 0) with
-            | false, true, _, false
-            | _, false, _, _ -> true, sr <<< 1
-            | _, _, true, _ -> false, sr
-            | _, _, false, _ -> true, sr <<< 2
+        match bmm  , mcm  , mct  , (c &&& 0x800 <> 0) with
+            | _    , false, _    , _                    
+            | false, true , _    , false                -> true, sr <<< 1
+            | _    , _    , true , _                    -> false, sr
+            | _                                         -> true, sr <<< 2
 
     // Determine shifted sprite state (srEnabled:bool, mcToggle:bool, xeToggle:bool, sr:int)
     let ClockedSprite rasterx x sre disp sr mc mct xe xet =
@@ -407,10 +407,10 @@ type Mos6567Chip (config:Mos6567Configuration) =
             | _    , _    , true , false, false, _
             | _    , _    , true , true , false, false -> true, true, true, sr <<< 2
             | _    , _    , false, true , _    , true
-            | _    , _    , true , true , false, true  -> true, true, false, sr
-            | _    , _    , true , false, true , _
-            | _    , _    , true , true , true , true  -> true, false, true, sr
-            | _    , _    , true , true , true , false -> true, false, false, sr
+            | _    , _    , _    , true , false, true  -> true, true, false, sr
+            | _    , _    , _    , false, _    , _
+            | _    , _    , _    , _    , _    , true  -> true, false, true, sr
+            | _                                        -> true, false, false, sr
 
     // Determine clocked raster position. (counterX:int, rasterY:int, rasterX:int)
     let ClockedRaster rasterCounter rasterY =

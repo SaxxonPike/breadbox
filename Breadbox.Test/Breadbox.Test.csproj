@@ -74,6 +74,8 @@
     <Compile Include="Mos6567FetchAddressTests.cs" />
     <Compile Include="Mos6567\Mos6567BaseTestFixture.cs" />
     <Compile Include="Mos6567\Mos6567RawGraphicsOutputTests.cs" />
+    <Compile Include="Mos6567\Mos6567ShiftGraphicsOutputTests.cs" />
+    <Compile Include="Mos6567\Mos6567ShiftSpriteOutputTests.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
