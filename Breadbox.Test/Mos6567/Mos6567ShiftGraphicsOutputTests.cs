@@ -10,10 +10,10 @@ namespace Breadbox.Test.Mos6567
     [TestFixture]
     public class Mos6567ShiftGraphicsOutputTests : Mos6567BaseTestFixture
     {
-        private static void Verify(Tuple<bool, int> result, int expectedData, bool expectedMultiColorToggle)
+        private static void Verify(GraphicsShiftOutput result, int expectedData, bool expectedMultiColorToggle)
         {
-            var observedMultiColorToggle = result.Item1;
-            var observedData = result.Item2;
+            var observedMultiColorToggle = result.MultiColorToggle;
+            var observedData = result.ShiftRegisterData;
 
             observedData.Should().Be(expectedData, "shift register should be correct");
             observedMultiColorToggle.Should().Be(expectedMultiColorToggle, "multicolor toggle should be correct");

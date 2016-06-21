@@ -46,15 +46,112 @@ type Mos6567Configuration (cyclesPerRasterLine, rasterLinesPerFrame) =
     member val RasterLinesPerFrame = rasterLinesPerFrame
     member val PixelsPerRasterLine = cyclesPerRasterLine * 8
 
+[<Struct>]
+type SpriteOutput =
+    val Color:int
+    val Output:bool
+    val Priority:bool
+    new (color, output, priority) = {
+        Color = color;
+        Output = output;
+        Priority = priority
+    }
 
+[<Struct>]
+type SpriteShiftOutput =
+    val ShiftRegisterEnable:bool
+    val MultiColorToggle:bool
+    val XExpansionToggle:bool
+    val ShiftRegisterData:int
+    new (sre, mct, xet, sr) = {
+        ShiftRegisterEnable = sre;
+        MultiColorToggle = mct;
+        XExpansionToggle = xet;
+        ShiftRegisterData = sr
+    }
 
+[<Struct>]
+type GraphicsOutput =
+    val Color:int
+    val Foreground:bool
+    new (color, foreground) = {
+        Color = color;
+        Foreground = foreground
+    }
 
+[<Struct>]
+type GraphicsShiftOutput =
+    val MultiColorToggle:bool
+    val ShiftRegisterData:int
+    new (mct, sr) = {
+        MultiColorToggle = mct;
+        ShiftRegisterData = sr
+    }
 
+[<Struct>]
+type ClockedRaster =
+    val Counter:int
+    val Y:int
+    val X:int
+    new (counter, y, x) = {
+        Counter = counter;
+        Y = y;
+        X = x
+    }
 
+[<Struct>]
+type MuxSpriteOutput =
+    val Color:int
+    val Output:bool
+    val Priority:bool
+    val SpriteCollisions:int
+    val DataCollisions:int
+    new (color, output, priority, spriteCollisions, dataCollisions) = {
+        Color = color;
+        Output = output;
+        Priority = priority;
+        SpriteCollisions = spriteCollisions;
+        DataCollisions = dataCollisions;
+    }
+    new (sprite:SpriteOutput, spriteCollisions, dataCollisions) = {
+        Color = sprite.Color;
+        Output = sprite.Output;
+        Priority = sprite.Priority;
+        SpriteCollisions = spriteCollisions;
+        DataCollisions = dataCollisions;
+    }
 
+[<Struct>]
+type MuxOutput =
+    val Color:int
+    val SpriteCollisions:int
+    val DataCollisions:int
+    new (color, spriteCollisions, dataCollisions) = {
+        Color = color;
+        SpriteCollisions = spriteCollisions;
+        DataCollisions = dataCollisions;
+    }
 
-
-
+[<Struct>]
+type Sprites =
+    val S0:SpriteOutput
+    val S1:SpriteOutput
+    val S2:SpriteOutput
+    val S3:SpriteOutput
+    val S4:SpriteOutput
+    val S5:SpriteOutput
+    val S6:SpriteOutput
+    val S7:SpriteOutput
+    new (s0, s1, s2, s3, s4, s5, s6, s7) = {
+        S0 = s0;
+        S1 = s1;
+        S2 = s2;
+        S3 = s3;
+        S4 = s4;
+        S5 = s5;
+        S6 = s6;
+        S7 = s7;
+    }
 
 
 type Mos6567Chip (config:Mos6567Configuration) =
@@ -308,46 +405,44 @@ type Mos6567Chip (config:Mos6567Configuration) =
     // Determine graphics output color and data [000] (color:int, foreground:bool)
     let RawGraphicsOutputStandardTextMode b0c color sr =
         match (sr &&& 0x80) with
-            | 0x80 -> (color >>> 8, true)
-            | _    -> (b0c, false)
+            | 0x80 -> new GraphicsOutput(color >>> 8, true)
+            | _    -> new GraphicsOutput(b0c, false)
 
     // Determine graphics output color and data [001] (color:int, foreground:bool)
     let RawGraphicsOutputMulticolorTextMode b0c b1c b2c color sr =
         match (sr &&& 0xC0), (color &&& 0x800) <> 0 with
-            | 0x40         , true                     -> (b1c, false)
-            | 0x80         , true                     -> (b2c, true)
+            | 0x40         , true                     -> new GraphicsOutput(b1c, false)
+            | 0x80         , true                     -> new GraphicsOutput(b2c, true)
             | 0x80         , _
-            | 0xC0         , _                        -> ((color >>> 8) &&& 0x7, true)
-            | _                                       -> (b0c, false)
+            | 0xC0         , _                        -> new GraphicsOutput((color >>> 8) &&& 0x7, true)
+            | _                                       -> new GraphicsOutput(b0c, false)
 
     // Determine graphics output color and data [010] (color:int, foreground:bool)
     let RawGraphicsOutputStandardBitmapMode color sr =
         match (sr &&& 0x80) with
-            | 0x80            -> ((color >>> 4) &&& 0xF, true)
-            | _               -> (color &&& 0xF, false)
+            | 0x80            -> new GraphicsOutput((color >>> 4) &&& 0xF, true)
+            | _               -> new GraphicsOutput(color &&& 0xF, false)
 
     // Determine graphics output color and data [011] (color:int, foreground:bool)
     let RawGraphicsOutputMulticolorBitmapMode b0c color sr =
         match (sr &&& 0xC0) with
-            | 0x40            -> ((color >>> 4) &&& 0xF, false)
-            | 0x80            -> (color &&& 0xF, true)
-            | 0xC0            -> ((color >>> 8), true)
-            | _               -> (b0c, false)
+            | 0x40            -> new GraphicsOutput((color >>> 4) &&& 0xF, false)
+            | 0x80            -> new GraphicsOutput(color &&& 0xF, true)
+            | 0xC0            -> new GraphicsOutput((color >>> 8), true)
+            | _               -> new GraphicsOutput(b0c, false)
 
     // Determine graphics output color and data [100] (color:int, foreground:bool)
     let RawGraphicsOutputExtraColorMode b0c b1c b2c b3c color sr =
         match (sr &&& 0x80), (color &&& 0xC0) with
-            | 0x80         , _                  -> ((color >>> 8), true)
-            | _            , 0x40               -> (b1c, false)
-            | _            , 0x80               -> (b2c, false)
-            | _            , 0xC0               -> (b3c, false)
-            | _                                 -> (b0c, false)
+            | 0x80         , _                  -> new GraphicsOutput((color >>> 8), true)
+            | _            , 0x40               -> new GraphicsOutput(b1c, false)
+            | _            , 0x80               -> new GraphicsOutput(b2c, false)
+            | _            , 0xC0               -> new GraphicsOutput(b3c, false)
+            | _                                 -> new GraphicsOutput(b0c, false)
 
     // Determine graphics output color and data [101] (color:int, foreground:bool)
     let RawGraphicsOutputInvalidExtraColorMode sr =
-        match (sr &&& 0x80) with
-            | 0x80            -> (0, true)
-            | _               -> (0, false)
+        new GraphicsOutput(0, sr &&& 0x80 <> 0)
 
     // Determine graphics output color and data (color:int, foreground:bool)
     let RawGraphicsOutput ecm bmm mcm b0c b1c b2c b3c color sr =
@@ -371,106 +466,100 @@ type Mos6567Chip (config:Mos6567Configuration) =
                     | _              , true      , 0xC00000          -> mmc1, true, dp
                     | _                                              -> 0, false, dp
 
-    // Determine border output color and data (color:int, output:bool)
-    let RawBorderOutput ec mborder vborder =
-        match mborder, vborder with
-            | true   , _
-            | _      , true      -> ec, true
-            | _                  -> 0, false
-
     // Determine which sprites are outputting (register:int)
-    let RawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7 =
-        (match s0 with | (_, true, _) -> 0x01 | _ -> 0x00) |||
-        (match s1 with | (_, true, _) -> 0x02 | _ -> 0x00) |||
-        (match s2 with | (_, true, _) -> 0x04 | _ -> 0x00) |||
-        (match s3 with | (_, true, _) -> 0x08 | _ -> 0x00) |||
-        (match s4 with | (_, true, _) -> 0x10 | _ -> 0x00) |||
-        (match s5 with | (_, true, _) -> 0x20 | _ -> 0x00) |||
-        (match s6 with | (_, true, _) -> 0x40 | _ -> 0x00) |||
-        (match s7 with | (_, true, _) -> 0x80 | _ -> 0x00)
+    let RawMuxSprites (sprites:Sprites) =
+        (if sprites.S0.Output then 0x01 else 0x00) |||
+        (if sprites.S1.Output then 0x02 else 0x00) |||
+        (if sprites.S2.Output then 0x04 else 0x00) |||
+        (if sprites.S3.Output then 0x08 else 0x00) |||
+        (if sprites.S4.Output then 0x10 else 0x00) |||
+        (if sprites.S5.Output then 0x20 else 0x00) |||
+        (if sprites.S6.Output then 0x40 else 0x00) |||
+        (if sprites.S7.Output then 0x80 else 0x00)
 
     // Determine shifted graphics state (mcToggle:bool, sr:int)
     let ClockedGraphics bmm mcm mct c sr =
         match bmm  , mcm  , mct  , (c &&& 0x800 <> 0) with
             | _    , false, _    , _                    
-            | false, true , _    , false                -> true, sr <<< 1
-            | _    , _    , true , _                    -> false, sr
-            | _                                         -> true, sr <<< 2
+            | false, true , _    , false                -> new GraphicsShiftOutput(true, sr <<< 1)
+            | _    , _    , true , _                    -> new GraphicsShiftOutput(false, sr)
+            | _                                         -> new GraphicsShiftOutput(true, sr <<< 2)
 
-    // Determine shifted sprite state (srEnabled:bool, mcToggle:bool, xeToggle:bool, sr:int)
+    // Determine shifted sprite state
     let ClockedSprite rasterx x sre disp sr mc mct xe xet =
         match disp, sre || (rasterx = x), mc, xe, mct, xet with
             | false, _    , _    , _    , _    , _
-            | _    , false, _    , _    , _    , _     -> false, true, true, sr
+            | _    , false, _    , _    , _    , _     -> new SpriteShiftOutput(false, true, true, sr)
             | _    , _    , false, false, _    , _
-            | _    , _    , false, true , _    , false -> true, true, true, sr <<< 1
+            | _    , _    , false, true , _    , false -> new SpriteShiftOutput(true, true, true, sr <<< 1)
             | _    , _    , true , false, false, _
-            | _    , _    , true , true , false, false -> true, true, true, sr <<< 2
+            | _    , _    , true , true , false, false -> new SpriteShiftOutput(true, true, true, sr <<< 2)
             | _    , _    , false, true , _    , true
-            | _    , _    , _    , true , false, true  -> true, true, false, sr
+            | _    , _    , _    , true , false, true  -> new SpriteShiftOutput(true, true, false, sr)
             | _    , _    , _    , false, _    , _
-            | _    , _    , _    , _    , _    , true  -> true, false, true, sr
-            | _                                        -> true, false, false, sr
+            | _    , _    , _    , _    , _    , true  -> new SpriteShiftOutput(true, false, true, sr)
+            | _                                        -> new SpriteShiftOutput(true, false, false, sr)
 
     // Determine clocked raster position. (counterX:int, rasterY:int, rasterX:int)
     let ClockedRaster rasterCounter rasterY =
         match (rasterCounter + 1) with
             | newCounter when newCounter >= PixelsPerRasterLine ->
                 match (rasterY + 1) with
-                    | newRasterY when newRasterY >= RasterLinesPerFrame -> 0, 0, 0
-                    | newRasterY -> 0, newRasterY, 0
-            | newCounter -> newCounter, rasterY, RasterCounterX.[newCounter]
+                    | newRasterY when newRasterY >= RasterLinesPerFrame -> new ClockedRaster(0, 0, 0)
+                    | newRasterY -> new ClockedRaster(0, newRasterY, 0)
+            | newCounter -> new ClockedRaster(newCounter, rasterY, RasterCounterX.[newCounter])
 
     // Determine frontmost sprite to render (color:int, output:bool, priority:bool)
-    let MuxSpritesForeground s0 s1 s2 s3 s4 s5 s6 s7 =
-        match s0, s1, s2, s3, s4, s5, s6, s7 with
-            | (_, true, _), _, _, _, _, _, _, _ -> s0
-            | _, (_, true, _), _, _, _, _, _, _ -> s1
-            | _, _, (_, true, _), _, _, _, _, _ -> s2
-            | _, _, _, (_, true, _), _, _, _, _ -> s3
-            | _, _, _, _, (_, true, _), _, _, _ -> s4
-            | _, _, _, _, _, (_, true, _), _, _ -> s5
-            | _, _, _, _, _, _, (_, true, _), _ -> s6
-            | _, _, _, _, _, _, _, (_, true, _) -> s7
-            | _                                 -> (0, false, true)
+    let MuxSpritesForeground (sprites:Sprites) =
+        if (sprites.S0.Output) then (sprites.S0)
+        elif (sprites.S1.Output) then (sprites.S1)
+        elif (sprites.S2.Output) then (sprites.S2)
+        elif (sprites.S3.Output) then (sprites.S3)
+        elif (sprites.S4.Output) then (sprites.S4)
+        elif (sprites.S5.Output) then (sprites.S5)
+        elif (sprites.S6.Output) then (sprites.S6)
+        elif (sprites.S7.Output) then (sprites.S7)
+        else new SpriteOutput(0, false, true)
 
-    // Determine sprite-sprite collision register result (register:int)
+    // Determine sprite-sprite collision register result
     let MuxSpriteSpriteCollision rawmux =
         match rawmux with
             | 0x00 | 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 | 0x40 | 0x80 -> 0x00
             | _ -> rawmux
 
-    // Determine sprite-data collision register result (register:int)
-    let MuxSpriteBackgroundCollision g rawmux =
-        match g with
-            | (_, false) -> 0x00
-            | _ -> rawmux
+    // Determine sprite-data collision register result
+    let MuxSpriteBackgroundCollision (g:GraphicsOutput) rawmux =
+        if not g.Foreground then 0x00 else rawmux
     
-    // Determine output sprite color, data, priority and collision (color:int, output:bool, priority:bool, spriteCollisions:int, dataCollisions:int)
-    let MuxSprites graphicsOutput s0 s1 s2 s3 s4 s5 s6 s7 =
-        match MuxSpritesForeground s0 s1 s2 s3 s4 s5 s6 s7, RawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7 with
-            | (color, output, priority), rawmux ->
-                (color, output, priority, MuxSpriteSpriteCollision rawmux, MuxSpriteBackgroundCollision graphicsOutput rawmux) 
+    // Determine output sprite color, data, priority and collision
+    let MuxSprites graphicsOutput sprites =
+        match MuxSpritesForeground sprites, RawMuxSprites sprites with
+            | spriteOutput, rawmux ->
+                new MuxSpriteOutput(spriteOutput, MuxSpriteSpriteCollision rawmux, MuxSpriteBackgroundCollision graphicsOutput rawmux)
+    
+    // Determine output color from mux
+    let MuxOutputColor graphicsOutput muxSpriteOutput =
+        match graphicsOutput, muxSpriteOutput with
+            | _, {MuxSpriteOutput.Output = false}
+            | {GraphicsOutput.Foreground = true}, {MuxSpriteOutput.Priority = true} -> graphicsOutput.Color
+            | _ -> muxSpriteOutput.Color
 
     // Determine graphics unit output (color:int, spriteCollisions:int, dataCollisions:int)
-    let Mux s0 s1 s2 s3 s4 s5 s6 s7 ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
+    let Mux sprites ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
         match vborder with
-            | true -> ec, 0x00, 0x00
+            | true -> new MuxOutput(ec, 0x00, 0x00)
             | _ ->
                 match RawGraphicsOutput ecm bmm mcm b0c b1c b2c b3c gc gsr with
-                    | (graphicsColor, graphicsForeground) ->
-                        match MuxSprites (graphicsColor, graphicsForeground) s0 s1 s2 s3 s4 s5 s6 s7 with
-                            | (spriteColor, spriteData, spritePriority, spriteSpriteCollisions, spriteDataCollisions) ->
-                                match graphicsForeground, spriteData, spritePriority with
-                                    | _, false, _ | true, _, true -> (graphicsColor, spriteSpriteCollisions, spriteDataCollisions)
-                                    | _ -> (spriteColor, spriteSpriteCollisions, spriteDataCollisions)
+                    | graphicsOutput ->
+                        match MuxSprites graphicsOutput sprites with
+                            | muxSpriteOutput ->
+                                new MuxOutput(MuxOutputColor graphicsOutput muxSpriteOutput, muxSpriteOutput.SpriteCollisions, muxSpriteOutput.DataCollisions)
 
     // Determine video output (color:int, spriteCollisions:int, dataCollisions:int)
-    let Output s0 s1 s2 s3 s4 s5 s6 s7 ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
-        match mborder, Mux s0 s1 s2 s3 s4 s5 s6 s7 ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr with
-            | true, (_, spriteSpriteCollisions, spriteDataCollisions) -> (ec, spriteSpriteCollisions, spriteDataCollisions)
-            | _, (color, spriteSpriteCollisions, spriteDataCollisions) -> (color, spriteSpriteCollisions, spriteDataCollisions)
-
+    let Output sprites ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr =
+        match mborder with 
+            | true -> new MuxOutput(ec, 0x00, 0x00)
+            | _ -> Mux sprites ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr
 
     member this.TestFetchIAddress () = FetchIAddress
     member this.TestFetchRAddress ref = FetchRAddress ref
@@ -487,14 +576,14 @@ type Mos6567Chip (config:Mos6567Configuration) =
     member this.TestRawGraphicsOutputInvalidExtraColorMode sr = RawGraphicsOutputInvalidExtraColorMode sr
 
     member this.TestRawSpriteOutput mmc0 mmc1 color multicolor sr dp disp = RawSpriteOutput mmc0 mmc1 color multicolor sr dp disp
-    member this.TestRawBorderOutput ec mborder vborder = RawBorderOutput ec mborder vborder
-    member this.TestRawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7 = RawMuxSprites s0 s1 s2 s3 s4 s5 s6 s7
+    member this.TestRawMuxSprites sprites = RawMuxSprites sprites
     member this.TestClockedGraphics bmm mcm mct c sr = ClockedGraphics bmm mcm mct c sr
     member this.TestClockedSprite rasterx x sre disp sr mc mct xe xet = ClockedSprite rasterx x sre disp sr mc mct xe xet
-    member this.TestMuxSpritesForeground s0 s1 s2 s3 s4 s5 s6 s7 = MuxSpritesForeground s0 s1 s2 s3 s4 s5 s6 s7
+    member this.TestMuxSpritesForeground sprites = MuxSpritesForeground sprites
     member this.TestMuxSpriteSpriteCollision rawmux = MuxSpriteSpriteCollision rawmux
     member this.TestMuxSpriteBackgroundCollision g rawmux = MuxSpriteBackgroundCollision g rawmux
-    member this.TestMuxSprites graphicsOutput s0 s1 s2 s3 s4 s5 s6 s7 = MuxSprites graphicsOutput s0 s1 s2 s3 s4 s5 s6 s7
-    member this.TestMux s0 s1 s2 s3 s4 s5 s6 s7 ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr = Mux s0 s1 s2 s3 s4 s5 s6 s7 ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr
-    member this.TestOutput s0 s1 s2 s3 s4 s5 s6 s7 ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr = Output s0 s1 s2 s3 s4 s5 s6 s7 ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr
+    member this.TestMuxSprites graphicsOutput sprites = MuxSprites graphicsOutput sprites
+    member this.TestMux sprites ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr = Mux sprites ec vborder ecm bmm mcm b0c b1c b2c b3c gc gsr
+    member this.TestOutput sprites ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr = Output sprites ec vborder mborder ecm bmm mcm b0c b1c b2c b3c gc gsr
     member this.TestClockedRaster rasterCounter rasterY = ClockedRaster rasterCounter rasterY
+    member this.TestMuxOutputColor graphicsOutput muxSpriteOutput = MuxOutputColor graphicsOutput muxSpriteOutput

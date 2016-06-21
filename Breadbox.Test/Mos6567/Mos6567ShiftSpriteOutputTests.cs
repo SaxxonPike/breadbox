@@ -10,13 +10,13 @@ namespace Breadbox.Test.Mos6567
     [TestFixture]
     public class Mos6567ShiftSpriteOutputTests : Mos6567BaseTestFixture
     {
-        private static void Verify(Tuple<bool, bool, bool, int> result, int expectedData,
+        private static void Verify(SpriteShiftOutput result, int expectedData,
             bool expectedMultiColorToggle, bool expectedXExpansionToggle, bool expectedShiftRegisterEnable)
         {
-            var observedShiftRegisterEnable = result.Item1;
-            var observedMultiColorToggle = result.Item2;
-            var observedXExpansionToggle = result.Item3;
-            var observedData = result.Item4;
+            var observedShiftRegisterEnable = result.ShiftRegisterEnable;
+            var observedMultiColorToggle = result.MultiColorToggle;
+            var observedXExpansionToggle = result.XExpansionToggle;
+            var observedData = result.ShiftRegisterData;
 
             observedData.Should().Be(expectedData, "shift register should be correct");
             observedShiftRegisterEnable.Should().Be(expectedShiftRegisterEnable, "shift register enable should be correct");

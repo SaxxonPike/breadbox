@@ -22,8 +22,8 @@ namespace Breadbox.Test.Mos6567
             var output = Vic.TestRawGraphicsOutputStandardTextMode(backgroundColor0, cFetch, graphicsShiftRegister);
 
             // Assert
-            output.Item1.Should().Be(expectedColor, "color should be correct");
-            output.Item2.Should().Be(expectedForeground, "foreground should be correct");
+            output.Color.Should().Be(expectedColor, "color should be correct");
+            output.Foreground.Should().Be(expectedForeground, "foreground should be correct");
         }
 
         [Test]
@@ -54,8 +54,8 @@ namespace Breadbox.Test.Mos6567
             var output = Vic.TestRawGraphicsOutputMulticolorTextMode(backgroundColor0, backgroundColor1, backgroundColor2, cFetch, graphicsShiftRegister);
 
             // Assert
-            output.Item1.Should().Be(expectedColor, "color should be correct");
-            output.Item2.Should().Be(expectedForeground, "foreground should be correct");
+            output.Color.Should().Be(expectedColor, "color should be correct");
+            output.Foreground.Should().Be(expectedForeground, "foreground should be correct");
         }
 
         [Test]
@@ -70,8 +70,8 @@ namespace Breadbox.Test.Mos6567
             var output = Vic.TestRawGraphicsOutputStandardBitmapMode(cFetch, graphicsShiftRegister);
 
             // Assert
-            output.Item1.Should().Be(expectedColor, "color should be correct");
-            output.Item2.Should().Be(expectedForeground, "foreground should be correct");
+            output.Color.Should().Be(expectedColor, "color should be correct");
+            output.Foreground.Should().Be(expectedForeground, "foreground should be correct");
         }
 
         [Test]
@@ -93,8 +93,8 @@ namespace Breadbox.Test.Mos6567
             var output = Vic.TestRawGraphicsOutputMulticolorBitmapMode(backgroundColor, cFetch, graphicsShiftRegister);
 
             // Assert
-            output.Item1.Should().Be(expectedColor, "color should be correct");
-            output.Item2.Should().Be(expectedForeground, "foreground should be correct");
+            output.Color.Should().Be(expectedColor, "color should be correct");
+            output.Foreground.Should().Be(expectedForeground, "foreground should be correct");
         }
 
         [Test]
@@ -123,8 +123,8 @@ namespace Breadbox.Test.Mos6567
             var output = Vic.TestRawGraphicsOutputExtraColorMode(backgroundColor0, backgroundColor1, backgroundColor2, backgroundColor3, cFetch, graphicsShiftRegister);
 
             // Assert
-            output.Item1.Should().Be(expectedColor, "color should be correct");
-            output.Item2.Should().Be(expectedForeground, "foreground should be correct");
+            output.Color.Should().Be(expectedColor, "color should be correct");
+            output.Foreground.Should().Be(expectedForeground, "foreground should be correct");
         }
 
 
