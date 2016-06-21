@@ -1090,8 +1090,7 @@ type Mos6502(config:Mos6502Configuration) =
 
     // ----- uOPS -----
 
-
-    let FetchDiscard address operation = ReadMemory address <| fun _ -> operation()
+    let FetchDiscard address operation = ReadMemory address <| (ignore >> operation)
     let FetchDummy operation = FetchDiscard pc <| operation
 
     let Fetch1RealInternal () =
@@ -1105,33 +1104,39 @@ type Mos6502(config:Mos6502Configuration) =
     let Fetch1Real () =
         IfReady <| Fetch1RealInternal
 
+    let Fetch1Internal () =
+        myIFlag <- i
+        i <- iFlagPending
+        match branchIrqHack, nmi, (irq && (not myIFlag)) with
+            | false, true, _ ->
+                interruptPending <- false
+                ea <- nmiVector
+                opcode <- vopNmi
+                nmi <- false
+                mi <- 0
+                restart <- true
+            | false, false, true ->
+                interruptPending <- false
+                ea <- irqVector
+                opcode <- vopIrq
+                mi <- 0
+                restart <- true
+            | _ -> Fetch1RealInternal()
+
+
     let Fetch1 () =
-        IfReady <| fun _ ->
-            myIFlag <- i
-            i <- iFlagPending
-            match branchIrqHack, nmi, (irq && (not myIFlag)) with
-                | false, true, _ ->
-                    interruptPending <- false
-                    ea <- nmiVector
-                    opcode <- vopNmi
-                    nmi <- false
-                    mi <- 0
-                    restart <- true
-                | false, false, true ->
-                    interruptPending <- false
-                    ea <- irqVector
-                    opcode <- vopIrq
-                    mi <- 0
-                    restart <- true
-                | _ -> Fetch1RealInternal()
+        IfReady <| Fetch1Internal
 
     let Fetch2 () = ReadMemoryPcIncrement <| SetOpcode2
     let Fetch3 () = ReadMemoryPcIncrement <| SetOpcode3
     let PushPch () = Push (GetPch()) <| ignore
     let PushPcl () = Push (GetPcl()) <| ignore
 
+    let DecrementS () =
+        s <- (s - 1) &&& 0xFF
+
     let PushDummy () =
-        ReadMemoryS <| fun _ -> s <- (s - 1) &&& 0xFF
+        ReadMemoryS <| (ignore >> DecrementS)
 
     let PushPInterrupt newB newEa =
         b <- newB
@@ -1157,17 +1162,21 @@ type Mos6502(config:Mos6502Configuration) =
                 true
             | _ -> false
 
+    let FetchPclVectorInternal () =
+        if nmi && ((ea = brkVector && b) || (ea = irqVector && (not b))) then
+            nmi <- false
+            ea <- nmiVector
+        aluTemp <- ReadMemoryInternal ea
+        
     let FetchPclVector () =
-        IfReady <| fun _ ->
-            if nmi && ((ea = brkVector && b) || (ea = irqVector && (not b))) then
-                nmi <- false
-                ea <- nmiVector
-            aluTemp <- ReadMemoryInternal ea
+        IfReady <| FetchPclVectorInternal
+
+    let FetchPchVectorInternal () =
+        aluTemp <- aluTemp ||| (ReadMemoryInternal(ea + 1) <<< 8)
+        pc <- aluTemp
             
     let FetchPchVector () =
-        IfReady <| fun _ ->
-            aluTemp <- aluTemp ||| (ReadMemoryInternal(ea + 1) <<< 8)
-            pc <- aluTemp
+        IfReady <| FetchPchVectorInternal
 
     let Imp operation = FetchDummy operation
     let ImpIny () = Imp <| fun _ -> (Inc y; y <- aluTemp)
@@ -1289,7 +1298,9 @@ type Mos6502(config:Mos6502Configuration) =
         FetchDummy <| fun _ ->
             pc <- (pc + (if aluTemp < 0 then -256 else 256)) &&& 0xFFFF
 
-    let IncS () = ReadMemoryS <| fun _ -> s <- (s + 1) &&& 0xFF
+    let IncrementS () = 
+        s <- (s + 1) &&& 0xFF
+    let IncS () = ReadMemoryS <| (ignore >> IncrementS)
     let Jsr () = ReadMemory pc <| SetPcJump
     let PullP () = Pull <| SetP
     let PullPcl () = Pull <| SetPcl
@@ -1791,9 +1802,9 @@ type Mos6502(config:Mos6502Configuration) =
                 | Uop.EndSuppressInterrupt -> EndSuppressInterrupt
                 | Uop.End -> End
                 | Uop.EndBranchSpecial -> EndBranchSpecial
-                | Uop.JamFFFE -> fun _ -> ReadMemory 0xFFFE ignore |> ignore; true
-                | Uop.JamFFFF -> fun _ -> ReadMemory 0xFFFF ignore |> ignore; true
-                | _ -> fun _ -> ReadMemory 0xFFFF ignore |> ignore; false
+                | Uop.JamFFFE -> fun _ -> FetchDiscard 0xFFFE |> ignore; true
+                | Uop.JamFFFF -> fun _ -> FetchDiscard 0xFFFF |> ignore; true
+                | _ -> fun _ -> FetchDiscard 0xFFFF |> ignore; false
         then
             mi <- mi + 1
 
