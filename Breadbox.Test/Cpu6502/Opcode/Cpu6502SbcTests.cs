@@ -6,6 +6,7 @@ using NUnit.Framework;
 namespace Breadbox.Test.Cpu6502.Opcode
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Self)]
     public class Cpu6502SbcTests : Cpu6502OpcodeBaseTestFixture
     {
         public Cpu6502SbcTests() : base(0xE9)

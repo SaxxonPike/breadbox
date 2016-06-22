@@ -8,6 +8,8 @@ using NUnit.Framework;
 
 namespace Breadbox.Test.Cpu6502.Opcode
 {
+    [TestFixture]
+    [Parallelizable(ParallelScope.Self)]
     public class Cpu6502CompareTests : Cpu6502ExecutionBaseTestFixture
     {
         private void CompareFlags(int register, int data)

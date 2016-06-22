@@ -8,6 +8,7 @@ using NUnit.Framework;
 namespace Breadbox.Test.Mos6567
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Self)]
     public class Mos6567ShiftSpriteOutputTests : Mos6567BaseTestFixture
     {
         private static void Verify(SpriteShiftOutput result, int expectedData,

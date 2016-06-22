@@ -486,19 +486,20 @@ type Mos6567Chip (config:Mos6567Configuration) =
             | _                                         -> new GraphicsShiftOutput(true, sr <<< 2)
 
     // Determine shifted sprite state
-    let ClockedSprite rasterx x sre disp sr mc mct xe xet =
-        match disp, sre || (rasterx = x), mc, xe, mct, xet with
-            | false, _    , _    , _    , _    , _
-            | _    , false, _    , _    , _    , _     -> new SpriteShiftOutput(false, true, true, sr)
-            | _    , _    , false, false, _    , _
-            | _    , _    , false, true , _    , false -> new SpriteShiftOutput(true, true, true, sr <<< 1)
-            | _    , _    , true , false, false, _
-            | _    , _    , true , true , false, false -> new SpriteShiftOutput(true, true, true, sr <<< 2)
-            | _    , _    , false, true , _    , true
-            | _    , _    , _    , true , false, true  -> new SpriteShiftOutput(true, true, false, sr)
-            | _    , _    , _    , false, _    , _
-            | _    , _    , _    , _    , _    , true  -> new SpriteShiftOutput(true, false, true, sr)
-            | _                                        -> new SpriteShiftOutput(true, false, false, sr)
+    let ClockedSprite (rasterx:int) x sre disp sr mc mct xe xet =
+        if (not disp) || (not (sre || (rasterx = x))) then
+            new SpriteShiftOutput(false, true, true, sr)
+        else
+            match mc, xe, mct, xet with
+                | false, false, _    , _
+                | false, true , _    , false -> new SpriteShiftOutput(true, true, true, sr <<< 1)
+                | true , false, false, _
+                | true , true , false, false -> new SpriteShiftOutput(true, true, true, sr <<< 2)
+                | false, true , _    , true
+                | _    , true , false, true  -> new SpriteShiftOutput(true, true, false, sr)
+                | _    , false, _    , _
+                | _    , _    , _    , true  -> new SpriteShiftOutput(true, false, true, sr)
+                | _                          -> new SpriteShiftOutput(true, false, false, sr)
 
     // Determine clocked raster position. (counterX:int, rasterY:int, rasterX:int)
     let ClockedRaster rasterCounter rasterY =

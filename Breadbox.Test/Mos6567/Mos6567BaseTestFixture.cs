@@ -8,6 +8,7 @@ using NUnit.Framework.Compatibility;
 namespace Breadbox.Test.Mos6567
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public class Mos6567BaseTestFixture
     {
         protected Mos6567Configuration Config { get; private set; }

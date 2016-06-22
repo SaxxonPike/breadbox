@@ -9,6 +9,7 @@ using NUnit.Framework.Compatibility;
 namespace Breadbox.Test.Cpu6502
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Children)]
     public abstract class Cpu6502BaseTestFixture
     {
         private Mos6502Configuration _config;

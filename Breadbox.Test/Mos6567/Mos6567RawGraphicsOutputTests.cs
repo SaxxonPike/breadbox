@@ -8,6 +8,7 @@ using NUnit.Framework;
 namespace Breadbox.Test.Mos6567
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Self)]
     public class Mos6567RawGraphicsOutputTests : Mos6567BaseTestFixture
     {
         [Test]

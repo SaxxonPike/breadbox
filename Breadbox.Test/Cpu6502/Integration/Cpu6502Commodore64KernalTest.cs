@@ -11,6 +11,8 @@ using NUnit.Framework;
 
 namespace Breadbox.Test.Cpu6502.Integration
 {
+    [TestFixture]
+    [Parallelizable(ParallelScope.Self)]
     public class Cpu6502Commodore64KernalTest
     {
         protected bool TraceEnabled { get; set; }

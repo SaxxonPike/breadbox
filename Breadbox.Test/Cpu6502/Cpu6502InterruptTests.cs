@@ -7,6 +7,7 @@ using NUnit.Framework;
 namespace Breadbox.Test.Cpu6502
 {
     [TestFixture]
+    [Parallelizable(ParallelScope.Self)]
     public class Cpu6502InterruptTests : Cpu6502BaseTestFixture
     {
         [Test]

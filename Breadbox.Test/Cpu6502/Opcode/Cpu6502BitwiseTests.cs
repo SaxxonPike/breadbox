@@ -8,6 +8,7 @@ using NUnit.Framework;
 
 namespace Breadbox.Test.Cpu6502.Opcode
 {
+    [Parallelizable(ParallelScope.Self)]
     public class Cpu6502BitwiseTests : Cpu6502ExecutionBaseTestFixture
     {
         [Test]
