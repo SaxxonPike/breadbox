@@ -1,6 +1,6 @@
 # breadbox
 
-MOS and (future) Commodore chip emulation in F#.
+MOS and (future) Commodore chip emulation in F#. These cores are designed to be accurate on the cycle level.
 
 ### Complete:
 
