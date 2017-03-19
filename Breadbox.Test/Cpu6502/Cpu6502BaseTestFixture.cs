@@ -4,7 +4,6 @@ using System.Linq;
 using Moq;
 using Moq.Language;
 using NUnit.Framework;
-using NUnit.Framework.Compatibility;
 
 namespace Breadbox.Test.Cpu6502
 {
