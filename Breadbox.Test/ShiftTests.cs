@@ -1,16 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using FluentAssertions;
+﻿using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Cpu6502.Opcode
+namespace Breadbox
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Self)]
-    public class Cpu6502ShiftTests : Cpu6502ExecutionBaseTestFixture
+    [Parallelizable(ParallelScope.Fixtures)]
+    public class ShiftTests : BreadboxBaseTestFixture
     {
         [Test]
         public void Asl([Range(0x0, 0xF, 0x5)] int lowOperand, [Range(0x0, 0xF, 0x5)] int highOperand)
@@ -23,7 +18,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var expectedOverflow = Cpu.V;
             var expectedCarry = (expectedResult & 0x100) != 0;
             expectedResult &= 0xFF;
-            MemoryMock.SetupSequence(m => m.Read(It.IsAny<int>()))
+            System.SetupSequence(m => m.Read(It.IsAny<int>()))
                 .Returns(0x00)
                 .Returns(operand);
             Cpu.SetOpcode(0x06);
@@ -36,6 +31,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
             Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
             Cpu.N.Should().Be(expectedSign, "N must be set correctly");
             Cpu.C.Should().Be(expectedCarry, "C must be set correctly");
+            System.Verify(m => m.Write(0, operand));
+            System.Verify(m => m.Write(0, expectedResult));
         }
 
         [Test]
@@ -73,7 +70,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var expectedZero = (expectedResult & 0xFF) == 0;
             var expectedOverflow = Cpu.V;
             var expectedCarry = (operand & 0x01) != 0;
-            MemoryMock.SetupSequence(m => m.Read(It.IsAny<int>()))
+            System.SetupSequence(m => m.Read(It.IsAny<int>()))
                 .Returns(0x00)
                 .Returns(operand);
             Cpu.SetOpcode(0x46);
@@ -86,6 +83,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
             Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
             Cpu.N.Should().Be(expectedSign, "N must be set correctly");
             Cpu.C.Should().Be(expectedCarry, "C must be set correctly");
+            System.Verify(m => m.Write(0, operand));
+            System.Verify(m => m.Write(0, expectedResult));
         }
 
         [Test]
@@ -123,7 +122,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var expectedZero = (expectedResult & 0xFF) == 0;
             var expectedOverflow = Cpu.V;
             var expectedCarry = (expectedResult & 0x100) != 0;
-            MemoryMock.SetupSequence(m => m.Read(It.IsAny<int>()))
+            System.SetupSequence(m => m.Read(It.IsAny<int>()))
                 .Returns(0x00)
                 .Returns(operand);
             Cpu.SetOpcode(0x26);
@@ -138,6 +137,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
             Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
             Cpu.N.Should().Be(expectedSign, "N must be set correctly");
             Cpu.C.Should().Be(expectedCarry, "C must be set correctly");
+            System.Verify(m => m.Write(0, operand));
+            System.Verify(m => m.Write(0, expectedResult));
         }
 
         [Test]
@@ -176,7 +177,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var expectedZero = (expectedResult & 0xFF) == 0;
             var expectedOverflow = Cpu.V;
             var expectedCarry = (operand & 0x01) != 0;
-            MemoryMock.SetupSequence(m => m.Read(It.IsAny<int>()))
+            System.SetupSequence(m => m.Read(It.IsAny<int>()))
                 .Returns(0x00)
                 .Returns(operand);
             Cpu.SetOpcode(0x66);
@@ -191,6 +192,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
             Cpu.Z.Should().Be(expectedZero, "Z must be set correctly");
             Cpu.N.Should().Be(expectedSign, "N must be set correctly");
             Cpu.C.Should().Be(expectedCarry, "C must be set correctly");
+            System.Verify(m => m.Write(0, operand));
+            System.Verify(m => m.Write(0, expectedResult));
         }
 
         [Test]

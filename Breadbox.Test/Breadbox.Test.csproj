@@ -7,9 +7,9 @@
     <ProjectGuid>{B4A2FC78-B16A-48A9-AB04-18AE3AE233E1}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Breadbox.Test</RootNamespace>
+    <RootNamespace>Breadbox</RootNamespace>
     <AssemblyName>Breadbox.Test</AssemblyName>
-    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -42,8 +42,8 @@
     <Reference Include="FluentAssertions.Core, Version=4.19.2.0, Culture=neutral, PublicKeyToken=33f2691a05b67b6a, processorArchitecture=MSIL">
       <HintPath>..\packages\FluentAssertions.4.19.2\lib\net45\FluentAssertions.Core.dll</HintPath>
     </Reference>
-    <Reference Include="Moq, Version=4.7.1.0, Culture=neutral, PublicKeyToken=69f491c39445e920, processorArchitecture=MSIL">
-      <HintPath>..\packages\Moq.4.7.1\lib\net45\Moq.dll</HintPath>
+    <Reference Include="Moq, Version=4.7.8.0, Culture=neutral, PublicKeyToken=69f491c39445e920, processorArchitecture=MSIL">
+      <HintPath>..\packages\Moq.4.7.8\lib\net45\Moq.dll</HintPath>
     </Reference>
     <Reference Include="nunit.framework, Version=3.6.1.0, Culture=neutral, PublicKeyToken=2638cd05610744eb, processorArchitecture=MSIL">
       <HintPath>..\packages\NUnit.3.6.1\lib\net45\nunit.framework.dll</HintPath>
@@ -51,33 +51,26 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Cpu6502\Integration\Cpu6502Commodore64KernalTest.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502AdcTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502AddressingTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502BitwiseTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502DecTests.cs" />
-    <Compile Include="Cpu6502\Cpu6502BaseTestFixture.cs" />
-    <Compile Include="Cpu6502\Cpu6502InterruptTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502ExecutionBaseTestFixture.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502FlagOpcodeTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502TransferTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502ShiftTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502BitTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502BranchTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502CompareTests.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502OpcodeBaseTestFixture.cs" />
-    <Compile Include="Cpu6502\Opcode\Cpu6502SbcTests.cs" />
-    <Compile Include="Mos6567FetchAddressTests.cs" />
-    <Compile Include="Mos6567\Mos6567BaseTestFixture.cs" />
-    <Compile Include="Mos6567\Mos6567RawGraphicsOutputTests.cs" />
-    <Compile Include="Mos6567\Mos6567ShiftGraphicsOutputTests.cs" />
-    <Compile Include="Mos6567\Mos6567ShiftSpriteOutputTests.cs" />
+    <Compile Include="AdcTests.cs" />
+    <Compile Include="AddressingTests.cs" />
+    <Compile Include="BitwiseTests.cs" />
+    <Compile Include="DecTests.cs" />
+    <Compile Include="BreadboxBaseTestFixture.cs" />
+    <Compile Include="ISystem.cs" />
+    <Compile Include="IncTests.cs" />
+    <Compile Include="InterruptTests.cs" />
+    <Compile Include="FlagOpcodeTests.cs" />
+    <Compile Include="PerformanceTests.cs" />
+    <Compile Include="TransferTests.cs" />
+    <Compile Include="ShiftTests.cs" />
+    <Compile Include="BitTests.cs" />
+    <Compile Include="BranchTests.cs" />
+    <Compile Include="CompareTests.cs" />
+    <Compile Include="OpcodeBaseTestFixture.cs" />
+    <Compile Include="SbcTests.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
@@ -87,13 +80,15 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="Resources\basic.901226-01.bin" />
-    <None Include="Resources\kernal.901227-03.bin" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Breadbox\Breadbox.fsproj">
       <Project>{aa8601c2-2f4e-4720-8868-297745913a14}</Project>
       <Name>Breadbox</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Testing\Testing.csproj">
+      <Project>{09529ad7-a804-4ac6-a2e0-7fb2c362af4e}</Project>
+      <Name>Testing</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup />

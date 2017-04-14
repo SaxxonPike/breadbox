@@ -1,18 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using FluentAssertions;
+﻿using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Cpu6502.Opcode
+namespace Breadbox
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Self)]
-    public class Cpu6502BitTests : Cpu6502OpcodeBaseTestFixture
+    [Parallelizable(ParallelScope.Fixtures)]
+    public class BitTests : OpcodeBaseTestFixture
     {
-        public Cpu6502BitTests() : base(0x24)
+        public BitTests() : base(0x24)
         {
         }
 
@@ -25,7 +20,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var expectedN = (data & 0x80) != 0;
             var expectedV = (data & 0x40) != 0;
             var expectedZ = (data & a) == 0;
-            MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(data);
+            System.Setup(m => m.Read(It.IsAny<int>())).Returns(data);
             Cpu.SetA(a);
 
             // Act

@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using FluentAssertions;
+﻿using FluentAssertions;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Cpu6502.Opcode
+namespace Breadbox
 {
-    public class Cpu6502FlagOpcodeTests : Cpu6502ExecutionBaseTestFixture
+    [Parallelizable(ParallelScope.Fixtures)]
+    public class FlagOpcodeTests : BreadboxBaseTestFixture
     {
         [Test]
         public void Clc([Range(0, 1)] int c)

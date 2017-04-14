@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Cpu6502.Opcode
+namespace Breadbox
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Self)]
-    public class Cpu6502AddressingTests : Cpu6502ExecutionBaseTestFixture
+    [Parallelizable(ParallelScope.Fixtures)]
+    public class AddressingTests : BreadboxBaseTestFixture
     {
         private enum AccessType
         {
@@ -32,9 +29,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
         private void Verify(IEnumerable<AccessEntry> accesses)
         {
             Cpu.ForceOpcodeSync();
-            MemoryMock.ResetCalls();
             foreach (var access in accesses)
             {
+                System.ResetCalls();
                 var address = access.Address;
                 Cpu.Clock();
                 switch (access.AccessType)
@@ -43,32 +40,31 @@ namespace Breadbox.Test.Cpu6502.Opcode
                         if (address >= 0)
                         {
                             Console.WriteLine("Verifying READ at ${0:x4}", address);
-                            MemoryMock.Verify(m => m.Read(It.IsIn(address)), Times.Once);
-                            MemoryMock.Verify(m => m.Read(It.IsNotIn(address)), Times.Never);
+                            System.Verify(m => m.Read(It.IsIn(address)), Times.Once);
+                            System.Verify(m => m.Read(It.IsNotIn(address)), Times.Never);
                         }
                         else
                         {
                             Console.WriteLine("Verifying READ at any address");
-                            MemoryMock.Verify(m => m.Read(It.IsAny<int>()), Times.Once);
+                            System.Verify(m => m.Read(It.IsAny<int>()), Times.Once);
                         }
-                        MemoryMock.Verify(m => m.Write(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+                        System.Verify(m => m.Write(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
                         break;
                     case AccessType.Write:
                         if (address >= 0)
                         {
                             Console.WriteLine("Verifying WRITE at ${0:x4}", address);
-                            MemoryMock.Verify(m => m.Write(It.IsIn(address), It.IsAny<int>()), Times.Once);
-                            MemoryMock.Verify(m => m.Write(It.IsNotIn(address), It.IsAny<int>()), Times.Never);
+                            System.Verify(m => m.Write(It.IsIn(address), It.IsAny<int>()), Times.Once);
+                            System.Verify(m => m.Write(It.IsNotIn(address), It.IsAny<int>()), Times.Never);
                         }
                         else
                         {
                             Console.WriteLine("Verifying WRITE at any address");
-                            MemoryMock.Verify(m => m.Write(It.IsAny<int>(), It.IsAny<int>()), Times.Once);
+                            System.Verify(m => m.Write(It.IsAny<int>(), It.IsAny<int>()), Times.Once);
                         }
-                        MemoryMock.Verify(m => m.Read(It.IsAny<int>()), Times.Never);
+                        System.Verify(m => m.Read(It.IsAny<int>()), Times.Never);
                         break;
                 }
-                MemoryMock.ResetCalls();
             }
             Cpu.Sync.Should().BeTrue("Sync must occur after opcode finishes.");
         }
@@ -79,9 +75,11 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetS(0xFD);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(0xFFFE)).Returns(interruptVector & 0xFF);
-            MemoryMock.Setup(m => m.Read(0xFFFF)).Returns((interruptVector >> 8) & 0xFF);
+
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(0xFFFE)).Returns(interruptVector & 0xFF);
+            System.Setup(m => m.Read(0xFFFF)).Returns((interruptVector >> 8) & 0xFF);
+
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -103,7 +101,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
         {
             // Arrange
             Cpu.SetPC(address);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address)).Returns(opcode);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -120,7 +118,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
         {
             // Arrange
             Cpu.SetPC(address);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address)).Returns(opcode);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -137,8 +135,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
         {
             // Arrange
             Cpu.SetPC(address);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -156,8 +154,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
         {
             // Arrange
             Cpu.SetPC(address);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -175,8 +173,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
         {
             // Arrange
             Cpu.SetPC(address);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -197,8 +195,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -218,8 +216,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -239,8 +237,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -262,8 +260,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -283,8 +281,8 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -303,11 +301,11 @@ namespace Breadbox.Test.Cpu6502.Opcode
         {
             // Arrange
             Cpu.SetPC(address);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
-            MemoryMock.Setup(m => m.Read(absAddress)).Returns(targetAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read((absAddress & 0xFF00) | ((absAddress + 1) & 0xFF))).Returns((targetAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(absAddress)).Returns(targetAddress & 0xFF);
+            System.Setup(m => m.Read((absAddress & 0xFF00) | ((absAddress + 1) & 0xFF))).Returns((targetAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -328,7 +326,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetS(0xFE);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address)).Returns(opcode);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -347,7 +345,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetS(0xFE);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address)).Returns(opcode);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -367,9 +365,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetS(0xFE);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(0x0100)).Returns(returnAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(0x0101)).Returns((returnAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(0x0100)).Returns(returnAddress & 0xFF);
+            System.Setup(m => m.Read(0x0101)).Returns((returnAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -391,9 +389,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetS(0xFE);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(0x01FF)).Returns(returnAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(0x0100)).Returns((returnAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(0x01FF)).Returns(returnAddress & 0xFF);
+            System.Setup(m => m.Read(0x0100)).Returns((returnAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -415,9 +413,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             // Arrange
             Cpu.SetPC(address);
             Cpu.SetS(0xFE);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -438,9 +436,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
         {
             // Arrange
             Cpu.SetPC(address);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -459,9 +457,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
         {
             // Arrange
             Cpu.SetPC(address);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -480,9 +478,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
         {
             // Arrange
             Cpu.SetPC(address);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new[]
             {
                 new AccessEntry(AccessType.Read, address),
@@ -505,9 +503,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new List<AccessEntry>
             {
                 new AccessEntry(AccessType.Read, address),
@@ -532,9 +530,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new List<AccessEntry>
             {
                 new AccessEntry(AccessType.Read, address),
@@ -556,9 +554,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new List<AccessEntry>
             {
                 new AccessEntry(AccessType.Read, address),
@@ -580,9 +578,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new List<AccessEntry>
             {
                 new AccessEntry(AccessType.Read, address),
@@ -606,9 +604,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new List<AccessEntry>
             {
                 new AccessEntry(AccessType.Read, address),
@@ -633,9 +631,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new List<AccessEntry>
             {
                 new AccessEntry(AccessType.Read, address),
@@ -657,9 +655,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new List<AccessEntry>
             {
                 new AccessEntry(AccessType.Read, address),
@@ -681,9 +679,9 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read(address + 2)).Returns((absAddress >> 8) & 0xFF);
             var accesses = new List<AccessEntry>
             {
                 new AccessEntry(AccessType.Read, address),
@@ -707,10 +705,10 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
-            MemoryMock.Setup(m => m.Read((zpAddress + x) & 0xFF)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read((zpAddress + x + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read((zpAddress + x) & 0xFF)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read((zpAddress + x + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
 
             var accesses = new List<AccessEntry>
             {
@@ -734,10 +732,10 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
-            MemoryMock.Setup(m => m.Read((zpAddress + x) & 0xFF)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read((zpAddress + x + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read((zpAddress + x) & 0xFF)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read((zpAddress + x + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
 
             var accesses = new List<AccessEntry>
             {
@@ -761,10 +759,10 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetX(x);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
-            MemoryMock.Setup(m => m.Read((zpAddress + x) & 0xFF)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read((zpAddress + x + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read((zpAddress + x) & 0xFF)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read((zpAddress + x + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
 
             var accesses = new List<AccessEntry>
             {
@@ -790,10 +788,10 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
-            MemoryMock.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
 
             var accesses = new List<AccessEntry>
             {
@@ -820,10 +818,10 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
-            MemoryMock.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
 
             var accesses = new List<AccessEntry>
             {
@@ -847,10 +845,10 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
-            MemoryMock.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
 
             var accesses = new List<AccessEntry>
             {
@@ -874,10 +872,11 @@ namespace Breadbox.Test.Cpu6502.Opcode
             address |= 0x80;
             Cpu.SetPC(address);
             Cpu.SetY(y);
-            MemoryMock.Setup(m => m.Read(address)).Returns(opcode);
-            MemoryMock.Setup(m => m.Read(address + 1)).Returns(zpAddress);
-            MemoryMock.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
-            MemoryMock.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
+
+            System.Setup(m => m.Read(address)).Returns(opcode);
+            System.Setup(m => m.Read(address + 1)).Returns(zpAddress);
+            System.Setup(m => m.Read(zpAddress)).Returns(absAddress & 0xFF);
+            System.Setup(m => m.Read((zpAddress + 1) & 0xFF)).Returns((absAddress >> 8) & 0xFF);
 
             var accesses = new List<AccessEntry>
             {

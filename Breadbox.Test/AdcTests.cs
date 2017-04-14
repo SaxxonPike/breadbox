@@ -1,15 +1,13 @@
-﻿using System;
-using FluentAssertions;
+﻿using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Cpu6502.Opcode
+namespace Breadbox
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Self)]
-    public class Cpu6502AdcTests : Cpu6502OpcodeBaseTestFixture
+    [Parallelizable(ParallelScope.Fixtures)]
+    public class AdcTests : OpcodeBaseTestFixture
     {
-        public Cpu6502AdcTests() : base(0x69)
+        public AdcTests() : base(0x69)
         {
         }
 
@@ -28,7 +26,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             Cpu.SetD(false);
             Cpu.SetC(carry);
             Cpu.SetA(a);
-            MemoryMock.SetupSequence(m => m.Read(It.IsAny<int>()))
+            System.SetupSequence(m => m.Read(It.IsAny<int>()))
                 .Returns(operand);
 
             // Act
@@ -66,7 +64,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             Cpu.SetD(true);
             Cpu.SetC(carry);
             Cpu.SetA(a);
-            MemoryMock.SetupSequence(m => m.Read(It.IsAny<int>()))
+            System.SetupSequence(m => m.Read(It.IsAny<int>()))
                 .Returns(operand);
 
             // Act

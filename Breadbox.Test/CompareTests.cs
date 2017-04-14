@@ -1,16 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 
-namespace Breadbox.Test.Cpu6502.Opcode
+namespace Breadbox
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Self)]
-    public class Cpu6502CompareTests : Cpu6502ExecutionBaseTestFixture
+    [Parallelizable(ParallelScope.Fixtures)]
+    public class CompareTests : BreadboxBaseTestFixture
     {
         private void CompareFlags(int register, int data)
         {
@@ -31,7 +27,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var data = lowData + (highData << 4);
             Cpu.SetA(a);
             Cpu.SetOpcode(0xC9);
-            MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(data);
+            System.Setup(m => m.Read(It.IsAny<int>())).Returns(data);
 
             // Act
             Cpu.ClockStep();
@@ -50,7 +46,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var data = lowData + (highData << 4);
             Cpu.SetX(x);
             Cpu.SetOpcode(0xE0);
-            MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(data);
+            System.Setup(m => m.Read(It.IsAny<int>())).Returns(data);
 
             // Act
             Cpu.ClockStep();
@@ -69,7 +65,7 @@ namespace Breadbox.Test.Cpu6502.Opcode
             var data = lowData + (highData << 4);
             Cpu.SetY(y);
             Cpu.SetOpcode(0xC0);
-            MemoryMock.Setup(m => m.Read(It.IsAny<int>())).Returns(data);
+            System.Setup(m => m.Read(It.IsAny<int>())).Returns(data);
 
             // Act
             Cpu.ClockStep();

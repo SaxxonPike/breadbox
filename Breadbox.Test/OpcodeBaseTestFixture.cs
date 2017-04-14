@@ -1,13 +1,13 @@
-﻿using Moq;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
-namespace Breadbox.Test.Cpu6502.Opcode
+namespace Breadbox
 {
-    public abstract class Cpu6502OpcodeBaseTestFixture : Cpu6502ExecutionBaseTestFixture
+    [Parallelizable(ParallelScope.Fixtures)]
+    public abstract class OpcodeBaseTestFixture : BreadboxBaseTestFixture
     {
         private readonly int _opcode;
 
-        protected Cpu6502OpcodeBaseTestFixture(int opcode)
+        protected OpcodeBaseTestFixture(int opcode)
         {
             _opcode = opcode;
         }
