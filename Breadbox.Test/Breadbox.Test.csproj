@@ -48,29 +48,34 @@
     <Reference Include="nunit.framework, Version=3.6.1.0, Culture=neutral, PublicKeyToken=2638cd05610744eb, processorArchitecture=MSIL">
       <HintPath>..\packages\NUnit.3.6.1\lib\net45\nunit.framework.dll</HintPath>
     </Reference>
+    <Reference Include="Ploeh.AutoFixture, Version=3.50.2.0, Culture=neutral, PublicKeyToken=b24654c590009d4f, processorArchitecture=MSIL">
+      <HintPath>..\packages\AutoFixture.3.50.2\lib\net40\Ploeh.AutoFixture.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AdcTests.cs" />
-    <Compile Include="AddressingTests.cs" />
-    <Compile Include="BitwiseTests.cs" />
-    <Compile Include="DecTests.cs" />
+    <Compile Include="BaseTestFixture.cs" />
+    <Compile Include="FileSystem.cs" />
+    <Compile Include="Mos6502\AdcTests.cs" />
+    <Compile Include="Mos6502\AddressingTests.cs" />
+    <Compile Include="Mos6502\BitwiseTests.cs" />
+    <Compile Include="Mos6502\DecTests.cs" />
     <Compile Include="BreadboxBaseTestFixture.cs" />
     <Compile Include="ISystem.cs" />
-    <Compile Include="IncTests.cs" />
-    <Compile Include="InterruptTests.cs" />
-    <Compile Include="FlagOpcodeTests.cs" />
-    <Compile Include="PerformanceTests.cs" />
-    <Compile Include="TransferTests.cs" />
-    <Compile Include="ShiftTests.cs" />
-    <Compile Include="BitTests.cs" />
-    <Compile Include="BranchTests.cs" />
-    <Compile Include="CompareTests.cs" />
-    <Compile Include="OpcodeBaseTestFixture.cs" />
-    <Compile Include="SbcTests.cs" />
+    <Compile Include="Mos6502\IncTests.cs" />
+    <Compile Include="Mos6502\InterruptTests.cs" />
+    <Compile Include="Mos6502\FlagOpcodeTests.cs" />
+    <Compile Include="Mos6502\PerformanceTests.cs" />
+    <Compile Include="Mos6502\TransferTests.cs" />
+    <Compile Include="Mos6502\ShiftTests.cs" />
+    <Compile Include="Mos6502\BitTests.cs" />
+    <Compile Include="Mos6502\BranchTests.cs" />
+    <Compile Include="Mos6502\CompareTests.cs" />
+    <Compile Include="Mos6502\OpcodeBaseTestFixture.cs" />
+    <Compile Include="Mos6502\SbcTests.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
