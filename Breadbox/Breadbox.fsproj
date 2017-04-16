@@ -55,8 +55,8 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Mos6502.fs" />
-    <Content Include="packages.config" />
     <Compile Include="Mos6567.fs" />
+    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
