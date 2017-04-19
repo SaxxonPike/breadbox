@@ -15,8 +15,12 @@ type Mos6567Configuration(read:System.Func<int, int>, lines:int, cyclesPerLine:i
 [<Sealed>]
 type Mos6567(config:Mos6567Configuration) =
     let ReadMemory = config.Read
-
-    let halfCycles = config.CyclesPerLine * 2
+    let clocksPerLine = config.CyclesPerLine * 8
+    let holdClocks = System.Math.Min(0x200 - clocksPerLine, 0)
+    let hBlankStart = 0x184 - ((0x200 - clocksPerLine) * 8)
+    let hBlankEnd = 0x19C - ((0x200 - System.Math.Min(0x200, clocksPerLine)))
+    let fetchStart = clocksPerLine - 0x094
+    let baStart = fetchStart - 0x018
 
     let mutable irq = false
     let mutable ba = true
@@ -64,416 +68,52 @@ type Mos6567(config:Mos6567Configuration) =
     let bnc = Array.create 4 0x0
     let mmn = Array.create 2 0x0
     let mnc = Array.create 8 0x0
-    let vmatrix = Array.create 40 0x000
-    let msr = Array.create 8 0x000000
-    let mcn = Array.create 8 0x00
-    let mpn = Array.create 8 0x00
-    let mutable gbuffer = 0x00
-    let mutable gsr = 0x00
-    let mutable cbuffer = 0x000
-    let mutable idle = true
-    let mutable raster = config.YStart
-    let mutable rasterX = config.XStart
     let mutable rasterI = 0x000
-    let outBuffer = Array.create 8 0x0
-    let mdma = Array.create 8 false
-    let mutable badlineEnable = false
-    let mutable refresh = 0x00
-    let mutable halfCycle = 0
-    let lastHalfCycle = halfCycles - 1
-    let lastRaster = config.Lines - 1
-    let topBorder = 0x037
-    let bottomBorder = 0x033
-    let leftBorder = 0x01F
-    let rightBorder = 0x14E
 
-    // Notes on hTiming
-    //
-    // - Sprite fetch 3 always happens on HBlank start
-    //   - We can infer all other functions based on this
-    // - Sprite fetch 0 all the way through the last G access is
-    //   identical on all platforms, all that differs is the spacing
-    //   - Sprite fetch 0 happens six cycles before HBlank
-    //   - Sprite fetch 0 BA happens three cycles prior to that
-
-    let noOp () =
-        ()
-
-    let colorBa () =
-        not ((badlineEnable) &&
-            (raster >= 0x30) &&
-            (raster < 0xF8) &&
-            (raster &&& 0x7 = yscroll))
-
-    let noBa () =
-        true
-
-    let spriteBa1 index0 () =
-        ba && (not mdma.[index0])
-
-    let spriteBa2 index0 index1 () =
-        ba && (not (mdma.[index0] || mdma.[index1]))
-
-    let spriteBa3 index0 index1 index2 () =
-        ba && (not (mdma.[index0] || mdma.[index1] || mdma.[index2]))
-
-    let fetchS0 index () =
-        let ptr = mpn.[index]
-        msr.[index] <- (msr.[index] &&& 0x00FFFF) ||| (((ReadMemory (mcn.[index] ||| ptr)) &&& 0xFF) <<< 16)
-        mpn.[index] <- (ptr + 1) &&& 0x3F
-
-    let fetchS1 index () =
-        let ptr = mpn.[index]
-        msr.[index] <- (msr.[index] &&& 0xFF00FF) ||| (((ReadMemory (mcn.[index] ||| ptr)) &&& 0xFF) <<< 8)
-        mpn.[index] <- (ptr + 1) &&& 0x3F
-
-    let fetchS2 index () =
-        let ptr = mpn.[index]
-        msr.[index] <- (msr.[index] &&& 0xFFFF00) ||| ((ReadMemory (mcn.[index] ||| ptr)) &&& 0xFF)
-        mpn.[index] <- (ptr + 1) &&& 0x3F
-
-    let fetchP index () =
-        mpn.[index] <- (ReadMemory (vm ||| 0x3F0 ||| index)) &&& 0xFF
-
-    let fetchC index () =
-        vmatrix.[index] <- ReadMemory (vm ||| vc)
-
-    let fetchG index () =
-        gbuffer <- 0xFF &&& (ReadMemory <|
-            (if ecm then 0x39FF else 0x3FFF) &&&
-                if idle then
-                     0x3FFF
-                else
-                    rc |||
-                        if mcm then
-                            ((vmatrix.[index] &&& 0xFF) <<< 3) ||| cb
-                        else
-                            (vc <<< 3) ||| (cb &&& 0x2000))
+    let mpn = Array.create 8 0x00
+    let mcn = Array.create 8 0x00
+    let msr = Array.create 8 0x000000
 
     let fetchI () =
-        ignore <| ReadMemory 0x3FFF
+        ReadMemory 0x39FF |> ignore
 
-    let fetchR () =
-        ignore <| ReadMemory (0x3F00 ||| refresh)
-        refresh <- ((refresh - 1) &&& 0xFF)
+    let fetchP index () =
+        mpn.[index] <- (ReadMemory (0x03F8 ||| index)) <<< 6
 
-    let decodeWidePixel () =
-        mcm && (bmm || (cbuffer &&& 0x800 <> 0))
+    let fetchS0 index () =
+        msr.[index] <- msr.[index] ||| ((ReadMemory (mpn.[index] ||| mcn.[index])) <<< 16)
 
-    let decodeBufferColor () =
-        match ecm, bmm, mcm with
-            | true, false, false ->
-                // ECM
-                if gbuffer &&& 1 = 0 then
-                    bnc.[(cbuffer >>> 6) &&& 0x3]
-                else
-                    cbuffer >>> 8
-            | false, false, b ->
-                // (multicolor/) text
-                if b && cbuffer &&& 0x800 <> 0 then
-                    match gbuffer &&& 0x3 with
-                        | 3 -> (cbuffer >>> 8) &&& 0x7
-                        | c -> bnc.[c]
-                else
-                    if gbuffer &&& 1 = 0 then
-                        bnc.[0]
-                    else
-                        cbuffer >>> 8
-            | false, true, true ->
-                // multicolor bitmap
-                match gbuffer &&& 0x3 with
-                    | 1 -> (cbuffer >>> 4) &&& 0xF
-                    | 2 -> cbuffer &&& 0xF
-                    | 3 -> (cbuffer >>> 8)
-                    | _ -> bnc.[0]
-            | false, true, false ->
-                // bitmap
-                if gbuffer &&& 1 = 0 then
-                    cbuffer &&& 0xF
-                else
-                    (cbuffer >>> 4) &&& 0xF
-            | _ ->
-                // invalid
-                0
+    let fetchS1 index () =
+        msr.[index] <- msr.[index] ||| ((ReadMemory (mpn.[index] ||| mcn.[index])) <<< 8)
 
-    let resetRx () =
-        rasterX <- 0
+    let fetchS2 index () =
+        msr.[index] <- msr.[index] ||| (ReadMemory (mpn.[index] ||| mcn.[index]))
 
-    let masterFetchTiming = [|
-        fetchP  0;
-        fetchS0 0;
-        fetchS1 0;
-        fetchS2 0;
-        fetchP  1;
-        fetchS0 1;
-        fetchS1 1;
-        fetchS2 1;
-        fetchP  2;
-        fetchS0 2;
-        fetchS1 2;
-        fetchS2 2;
-        fetchP  3;
-        fetchS0 3;
-        fetchS1 3;
-        fetchS2 3;
-        fetchP  4;
-        fetchS0 4;
-        fetchS1 4;
-        fetchS2 4;
-        fetchP  5;
-        fetchS0 5;
-        fetchS1 5;
-        fetchS2 5;
-        fetchP  6;
-        fetchS0 6;
-        fetchS1 6;
-        fetchS2 6;
-        fetchP  7;
-        fetchS0 7;
-        fetchS1 7;
-        fetchS2 7;
-        fetchR   ;
-        noOp     ;
-        fetchR   ;
-        noOp     ;
-        fetchR   ;
-        resetRx  ;
-        fetchR   ;
-        noOp     ;
-        fetchR   ;
-        fetchC  0;
-        fetchG  0;
-        fetchC  1;
-        fetchG  1;
-        fetchC  2;
-        fetchG  2;
-        fetchC  3;
-        fetchG  3;
-        fetchC  4;
-        fetchG  4;
-        fetchC  5;
-        fetchG  5;
-        fetchC  6;
-        fetchG  6;
-        fetchC  7;
-        fetchG  7;
-        fetchC  8;
-        fetchG  8;
-        fetchC  9;
-        fetchG  9;
-        fetchC 10;
-        fetchG 10;
-        fetchC 11;
-        fetchG 11;
-        fetchC 12;
-        fetchG 12;
-        fetchC 13;
-        fetchG 13;
-        fetchC 14;
-        fetchG 14;
-        fetchC 15;
-        fetchG 15;
-        fetchC 16;
-        fetchG 16;
-        fetchC 17;
-        fetchG 17;
-        fetchC 18;
-        fetchG 18;
-        fetchC 19;
-        fetchG 19;
-        fetchC 20;
-        fetchG 20;
-        fetchC 21;
-        fetchG 21;
-        fetchC 22;
-        fetchG 22;
-        fetchC 23;
-        fetchG 23;
-        fetchC 24;
-        fetchG 24;
-        fetchC 25;
-        fetchG 25;
-        fetchC 26;
-        fetchG 26;
-        fetchC 27;
-        fetchG 27;
-        fetchC 28;
-        fetchG 28;
-        fetchC 29;
-        fetchG 29;
-        fetchC 30;
-        fetchG 30;
-        fetchC 31;
-        fetchG 31;
-        fetchC 32;
-        fetchG 32;
-        fetchC 33;
-        fetchG 33;
-        fetchC 34;
-        fetchG 34;
-        fetchC 35;
-        fetchG 35;
-        fetchC 36;
-        fetchG 36;
-        fetchC 37;
-        fetchG 37;
-        fetchC 38;
-        fetchG 38;
-        fetchC 39;
-        fetchG 39;
-    |]
-
-    let masterBaTiming = [|
-        spriteBa1 0;
-        spriteBa1 0;
-        spriteBa1 0;
-        spriteBa1 0;
-        spriteBa2 0 1;
-        spriteBa2 0 1;
-        spriteBa2 0 1;
-        spriteBa2 0 1;
-        spriteBa3 0 1 2;
-        spriteBa3 0 1 2;
-        spriteBa2 1 2;
-        spriteBa2 1 2;
-        spriteBa3 1 2 3;
-        spriteBa3 1 2 3;
-        spriteBa2 2 3;
-        spriteBa2 2 3;
-        spriteBa3 2 3 4;
-        spriteBa3 2 3 4;
-        spriteBa2 3 4;
-        spriteBa2 3 4;
-        spriteBa3 3 4 5;
-        spriteBa3 3 4 5;
-        spriteBa2 4 5;
-        spriteBa2 4 5;
-        spriteBa3 4 5 6;
-        spriteBa3 4 5 6;
-        spriteBa2 5 6;
-        spriteBa2 5 6;
-        spriteBa3 5 6 7;
-        spriteBa3 5 6 7;
-        spriteBa2 6 7;
-        spriteBa2 6 7;
-        spriteBa2 6 7;
-        spriteBa2 6 7;
-        spriteBa1 7;
-        spriteBa1 7;
-        spriteBa1 7;
-        spriteBa1 7;
-        noBa;
-        noBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-        colorBa;
-    |]
-
-    let hTiming =
-        // fetch
-        let fetchOp = Array.init halfCycles <| fun i ->
-            if (i % 1) = 0 then
-                fetchI
-            else
-                noOp
-        for i = 0 to halfCycles - 1 do
-            let timingIndex = (i + 12) % halfCycles
-            if (timingIndex < masterFetchTiming.Length) then
-                fetchOp.[i] <- masterFetchTiming.[timingIndex]
-        // ba
-        let baOp = Array.init (config.CyclesPerLine * 2) <| fun i ->
-            noBa
-        for i = 0 to halfCycles - 1 do
-            let timingIndex = (i + 18) % halfCycles
-            if (timingIndex < masterBaTiming.Length) then
-                baOp.[i] <- masterBaTiming.[timingIndex]
-        // composition
-        let output = Array.init halfCycles <| fun i ->
-            fetchOp.[i] >> baOp.[i]
-        output
+    let timingX =
+        Array.init clocksPerLine <| fun x ->
+            match x with
+                | x when x <= hBlankStart -> x
+                | x when x - hBlankStart < holdClocks -> hBlankStart
+                | _ -> x - holdClocks
+            
+    let timingFetch =
+        let noop = fun () -> ()
+        let result = Array.init clocksPerLine <| fun x ->
+            match x with
+                | x when (x &&& 0x7) = 0x4 -> fetchI
+                | _ -> noop
+        for x = 0 to 125 do
+            result.[((x * 4) + fetchStart) % clocksPerLine] <-
+                match x with
+                    |   0 -> fetchP  0
+                    |   1 -> fetchS0 0
+                    |   2 -> fetchS1 0
+                    |   3 -> fetchS2 0
+                    |   4 -> fetchP  1
+                    |   5 -> fetchS0 1
+                    |   6 -> fetchS1 1
+                    |   7 -> fetchS2 1
+                    |   _ -> noop
 
     let getBitmask (arr:bool[]) =
         (if arr.[0] then 0x01 else 0x00) |||
@@ -798,25 +438,6 @@ type Mos6567(config:Mos6567Configuration) =
         match i with
             | _ -> pokeRegister.[i]
 
-    let rec ClockInternal index =
-        if (index &&& 0x3 = 0) then
-            let thisHalfCycle = halfCycle
-            ba <- hTiming.[thisHalfCycle]()
-            halfCycle <-
-                if thisHalfCycle = lastHalfCycle then
-                    let thisRaster = raster
-                    raster <-
-                        if thisRaster = lastRaster then
-                            0
-                        else
-                            thisRaster + 1
-                    0
-                else
-                    halfCycle + 1
-
-        if index < 8 then
-            ClockInternal <| index + 1
-
     member this.Irq = irq
     member this.Ba = ba
     member this.Aec = aec
@@ -836,5 +457,3 @@ type Mos6567(config:Mos6567Configuration) =
 
     member this.Write address value =
         writeRegister.[address &&& 0x3F] <| (value &&& 0xFF)
-
-    member this.Output = outBuffer
