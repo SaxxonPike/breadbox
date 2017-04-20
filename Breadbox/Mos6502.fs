@@ -74,7 +74,7 @@ type Mos6502(config:Mos6502Configuration) =
     let mutable z = false
     let mutable c = 0x00
 
-    let mutable totalCycles = 0UL
+    let mutable totalCycles = 0L
 
     let lxaConstant = config.LxaConstant
     let hasDecimalMode = config.HasDecimalMode
@@ -1263,13 +1263,13 @@ type Mos6502(config:Mos6502Configuration) =
             restart <- false
             ExecuteOneRetryInternal()
         else
-            totalCycles <- totalCycles + 1UL
+            totalCycles <- totalCycles + 1L
 
     let ExecuteOneRetry () =
         let thisNmi = readNmi()
         rdy <- readRdy()
         irq <- irq || readIrq()
-        nmi <- nmi || ((not lastNmi) && thisNmi)
+        nmi <- nmi || (thisNmi && (not lastNmi))
         interruptPending <- nmi || irq
         lastNmi <- thisNmi
         ExecuteOneRetryInternal()
