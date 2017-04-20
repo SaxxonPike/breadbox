@@ -148,11 +148,11 @@ type Mos6502(config:Mos6502Configuration) =
             pc <- pc + 1
             mem |> operation)
 
-    let ReadMemoryS operation =
-        ReadMemory (0x100 ||| s) <| operation
+    let ReadMemoryS =
+        ReadMemory (0x100 ||| s)
 
-    let WriteMemoryS value operation =
-        WriteMemory (0x100 ||| s) value <| operation
+    let WriteMemoryS value =
+        WriteMemory (0x100 ||| s) value
 
     let Push value operation =
         WriteMemoryS value <| (fun mem ->
@@ -433,7 +433,7 @@ type Mos6502(config:Mos6502Configuration) =
 
 
     let FetchDiscard address operation = ReadMemory address <| (ignore >> operation)
-    let FetchDummy operation = FetchDiscard pc operation
+    let FetchDummy = FetchDiscard pc
 
     let Fetch1RealInternal () =
         let currentPc = pc
@@ -518,7 +518,7 @@ type Mos6502(config:Mos6502Configuration) =
     let FetchPchVector () =
         IfReady FetchPchVectorInternal
 
-    let Imp operation = FetchDummy operation
+    let Imp = FetchDummy
     let ImpIny () = Imp <| fun _ -> (Inc y; y <- aluTemp)
     let ImpDey () = Imp <| fun _ -> (Dec y; y <- aluTemp)
     let ImpInx () = Imp <| fun _ -> (Inc x; x <- aluTemp)
@@ -581,7 +581,7 @@ type Mos6502(config:Mos6502Configuration) =
     let IndIdxWriteStage6Sta () = IndIdxWriteStage6 <| a
     let IndIdxWriteStage6Sha () = IndIdxWriteStage6 <| (a &&& x &&& 7)
 
-    let IndIdxReadStage6 operation = ReadMemory ea <| operation
+    let IndIdxReadStage6 = ReadMemory ea
     let IndIdxReadStage6Lda () = IndIdxReadStage6 <| Lda
     let IndIdxReadStage6Cmp () = IndIdxReadStage6 <| CmpA
     let IndIdxReadStage6And () = IndIdxReadStage6 <| And
@@ -593,7 +593,7 @@ type Mos6502(config:Mos6502Configuration) =
 
     let IndIdxRmwStage6 () = ReadMemory ea <| SetAlu
 
-    let IndIdxRmwStage7 operation = WriteMemory ea aluTemp <| operation
+    let IndIdxRmwStage7 = WriteMemory ea aluTemp
     let IndIdxRmwStage7Slo () = IndIdxRmwStage7 <| Slo
     let IndIdxRmwStage7Sre () = IndIdxRmwStage7 <| Sre
     let IndIdxRmwStage7Rra () = IndIdxRmwStage7 <| Rra
@@ -644,7 +644,7 @@ type Mos6502(config:Mos6502Configuration) =
     let PullPchNoInc () =
         IfReady <| fun _ -> pc <- (pc &&& 0x00FF) ||| (ReadMemoryInternal(0x0100 ||| s) <<< 8)
 
-    let AbsRead operation = ReadMemory ((opcode3 <<< 8) ||| opcode2) <| operation
+    let AbsRead = ReadMemory ((opcode3 <<< 8) ||| opcode2)
     let AbsReadLda () = AbsRead <| SetNZA
     let AbsReadLdy () = AbsRead <| SetNZY
     let AbsReadLdx () = AbsRead <| SetNZX
@@ -670,7 +670,7 @@ type Mos6502(config:Mos6502Configuration) =
     let ZpIdxRmwStage4 () = ReadMemory opcode2 <| SetAlu
     let ZpIdxRmwStage6 () = WriteMemory opcode2 aluTemp <| ignore
 
-    let ZpRead operation = ReadMemory opcode2 <| operation
+    let ZpRead = ReadMemory opcode2
     let ZpReadEor () = ZpRead <| Eor
     let ZpReadBit () = ZpRead <| Bit
     let ZpReadLda () = ZpRead <| Lda
@@ -686,7 +686,7 @@ type Mos6502(config:Mos6502Configuration) =
     let ZpReadAdc () = ZpRead <| Adc
     let ZpReadAnd () = ZpRead <| And
 
-    let Imm operation = ReadMemoryPcIncrement <| operation
+    let Imm = ReadMemoryPcIncrement
     let ImmEor () = Imm <| Eor
     let ImmAnc () = Imm <| Anc
     let ImmAsr () = Imm <| Asr
@@ -711,7 +711,7 @@ type Mos6502(config:Mos6502Configuration) =
     let IdxIndStage4 () = ReadMemory aluTemp <| SetLowEa
     let IdxIndStage5 () = ReadMemory (aluTemp + 1) <| SetHighEa
 
-    let IdxIndReadStage6 operation = ReadMemory ea <| operation
+    let IdxIndReadStage6 = ReadMemory ea
     let IdxIndReadStage6Lda () = IdxIndReadStage6 <| Lda
     let IdxIndReadStage6Ora () = IdxIndReadStage6 <| Ora
     let IdxIndReadStage6Lax () = IdxIndReadStage6 <| Lax
@@ -727,7 +727,7 @@ type Mos6502(config:Mos6502Configuration) =
 
     let IdxIndRmwStage6 () = ReadMemory ea <| SetAlu
 
-    let IdxIndRmwStage7 operation = WriteMemory ea aluTemp <| operation
+    let IdxIndRmwStage7 = WriteMemory ea aluTemp
     let IdxIndRmwStage7Slo () = IdxIndRmwStage7 <| Slo
     let IdxIndRmwStage7Sre () = IdxIndRmwStage7 <| Sre
     let IdxIndRmwStage7Rra () = IdxIndRmwStage7 <| Rra
@@ -751,7 +751,7 @@ type Mos6502(config:Mos6502Configuration) =
 
     let PullANoInc () = ReadMemoryS <| SetAInternal
 
-    let Imp operation = FetchDummy <| operation
+    let Imp = FetchDummy
     let ImpAslA () = Imp <| AslA
     let ImpRolA () = Imp <| RolA
     let ImpRorA () = Imp <| RorA
@@ -762,7 +762,7 @@ type Mos6502(config:Mos6502Configuration) =
 
     let ZpRmwStage3 () = ReadMemory opcode2 <| SetAlu
     let ZpRmwStage5 () = WriteMemory opcode2 aluTemp <| ignore
-    let ZpRmw operation = WriteMemory opcode2 aluTemp <| operation
+    let ZpRmw = WriteMemory opcode2 aluTemp
 
     let ZpRmwInc () = ZpRmw <| Inc
     let ZpRmwDec () = ZpRmw <| Dec
@@ -818,7 +818,7 @@ type Mos6502(config:Mos6502Configuration) =
     let AbsIdxRmwStage5 () = ReadMemory ea <| SetAlu
     let AbsIdxRmwStage7 () = WriteMemory ea aluTemp <| ignore
 
-    let AbsIdxRmwStage6 operation = WriteMemory ea aluTemp <| operation
+    let AbsIdxRmwStage6 = WriteMemory ea aluTemp
     let AbsIdxRmwStage6Dec () = AbsIdxRmwStage6 <| Dec
     let AbsIdxRmwStage6Dcp () = AbsIdxRmwStage6 <| Dcp
     let AbsIdxRmwStage6Isc () = AbsIdxRmwStage6 <| Isc
@@ -832,7 +832,7 @@ type Mos6502(config:Mos6502Configuration) =
     let AbsIdxRmwStage6Asl () = AbsIdxRmwStage6 <| Asl
     let AbsIdxRmwStage6Ror () = AbsIdxRmwStage6 <| Ror
 
-    let AbsIdxReadStage5 operation = ReadMemory ea <| operation
+    let AbsIdxReadStage5 = ReadMemory ea
     let AbsIdxReadStage5Lda () = AbsIdxReadStage5 <| Lda
     let AbsIdxReadStage5Ldx () = AbsIdxReadStage5 <| Ldx
     let AbsIdxReadStage5Lax () = AbsIdxReadStage5 <| Lax
@@ -861,7 +861,7 @@ type Mos6502(config:Mos6502Configuration) =
             ea <- (opcode3 <<< 8) + opcode2
             aluTemp <- ReadMemoryInternal ea
 
-    let AbsRmwStage5 operation = WriteMemory ea aluTemp <| operation
+    let AbsRmwStage5 = WriteMemory ea aluTemp
     let AbsRmwStage5Inc () = AbsRmwStage5 <| Inc
     let AbsRmwStage5Dec () = AbsRmwStage5 <| Dec
     let AbsRmwStage5Dcp () = AbsRmwStage5 <| Dcp
