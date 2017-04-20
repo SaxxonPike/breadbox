@@ -22,6 +22,8 @@ type Mos6567(config:Mos6567Configuration) =
     let fetchStart = clocksPerLine - 0x094
     let baStart = fetchStart - 0x018
 
+    let bitFlags = Array.init 8 <| fun i -> 1 <<< i
+
     let mutable irq = false
     let mutable ba = true
     let mutable aec = true
@@ -73,9 +75,17 @@ type Mos6567(config:Mos6567Configuration) =
     let mpn = Array.create 8 0x00
     let mcn = Array.create 8 0x00
     let msr = Array.create 8 0x000000
+    let mutable refresh = 0x00
+    
+    let matrix = Array.create 40 0x000
+    let mutable gbuffer = 0x00
+    let mutable cbuffer = 0x000
+    let mutable coutput = 0x000
+    let mutable gsr = 0x00
+    let mutable badline = false
 
     let fetchI () =
-        ReadMemory 0x39FF |> ignore
+        ReadMemory 0x3FFF |> ignore
 
     let fetchP index () =
         mpn.[index] <- (ReadMemory (0x03F8 ||| index)) <<< 6
@@ -88,6 +98,106 @@ type Mos6567(config:Mos6567Configuration) =
 
     let fetchS2 index () =
         msr.[index] <- msr.[index] ||| (ReadMemory (mpn.[index] ||| mcn.[index]))
+
+    let fetchR () =
+        let newRefresh = (refresh - 1) &&& 0xFF
+        ReadMemory 0x3F00 ||| newRefresh |> ignore
+        refresh <- newRefresh
+
+    let fetchC index () =
+        if badline then
+            let data = ReadMemory (vm ||| vc)
+            matrix.[index] <- data
+            cbuffer <- data
+        else
+            cbuffer <- matrix.[index]
+
+    let getFetchGInternal () =
+        let inline ec address = address &&& 0x39FF
+        let inline text index = ((matrix.[index] &&& 0xFF) <<< 3) ||| cb ||| rc
+        let inline bitmap index = (vc <<< 3) ||| (cb &&& 0x2000) ||| rc
+        match bmm, ecm with
+            | false, false -> text
+            | false, _     -> text >> ec
+            | true, false  -> bitmap
+            | _,    _      -> bitmap >> ec
+
+    let mutable fetchGInternal = getFetchGInternal()
+
+    let fetchG index () =
+        gbuffer <- (ReadMemory <| fetchGInternal index)
+
+    let getClockMux mcm bmm ecm =
+        let getDataOutput =
+            let inline singleColor c g = ((g &&& 0x1) <<< 1) ||| (g &&& 0x1)
+            let inline multiColor c g = g &&& 0x3
+            let inline multiColorText c g = if (c &&& 0x800) <> 0 then multiColor c g else singleColor c g
+            match mcm,   bmm with
+                | false, _     -> singleColor
+                | _,     false -> multiColorText
+                | _,     _     -> multiColor
+        
+        let getDataColorOutput =
+            let inline invalid c d = 0
+            let inline extraColorText c d = if (d <> 0) then (c >>> 8) else bnc.[(c >>> 6) &&& 0x3]
+            let inline singleColorText c d = if (d <> 0) then (c >>> 8) else bnc.[0]
+            let inline multiColorText c d = if (d < 3) then bnc.[d] else (c >>> 8)
+            let inline singleColorBitmap c d = (if (d <> 0) then c else (c >>> 4)) &&& 0xF
+            let inline multiColorBitmap c d =
+                match d with
+                    | 0b01 -> (c >>> 4) &&& 0xF 
+                    | 0b10 -> c &&& 0xF
+                    | 0b11 -> c >>> 8
+                    | _ -> bnc.[0]
+            match mcm,   bmm,   ecm with
+                | false, false, true  -> extraColorText
+                | _,     _,     true  -> invalid
+                | false, false, _     -> singleColorText
+                | false, true,  _     -> singleColorBitmap
+                | _,     false, _     -> multiColorText
+                | _,     _,     _     -> multiColorBitmap
+    
+        let getDataColorIdleOutput =
+            let inline black c d = 0
+            let inline blackPlusBackground c d = if (d <> 0) then 0 else bnc.[0]
+            match mcm,   bmm,   ecm with
+                | false, false, true  -> blackPlusBackground
+                | _,     _,     true
+                | false, true,  false -> black
+                | _,     _,     _     -> blackPlusBackground
+
+        let inline getSpriteOutput index =
+            if mnmc.[index] then
+                msr.[index] &&& 0x3
+            else
+                (msr.[index] &&& 0x1) <<< 1
+
+        let inline getSpriteColorOutput index d =
+            if d = 0b10 then mnc.[index] else mmn.[d >>> 1]
+
+        let inline collideSprites d =
+            let mutable frontMost = -1
+            let mutable spriteCollision = 0x00
+            let mutable dataCollision = 0x00
+            for sprite = 0 to 7 do
+                let output = getSpriteOutput sprite
+                if (output <> 0) then
+                    if (frontMost >= 0) then
+                        mnm.[sprite] <- true
+                        mnm.[frontMost] <- true
+                    else
+                        frontMost <- sprite
+                    if (d >= 0b10) then
+                        mnd.[sprite] <- true
+            frontMost
+
+        fun _ ->
+            let graphicsDataOutput = getDataOutput coutput gsr
+            let visibleSpriteNumber = collideSprites graphicsDataOutput
+            if visibleSpriteNumber < 0 || mndp.[visibleSpriteNumber] then
+                getDataColorOutput coutput graphicsDataOutput
+            else
+                getSpriteColorOutput visibleSpriteNumber (getSpriteOutput visibleSpriteNumber)
 
     let timingX =
         Array.init clocksPerLine <| fun x ->
@@ -105,15 +215,15 @@ type Mos6567(config:Mos6567Configuration) =
         for x = 0 to 125 do
             result.[((x * 4) + fetchStart) % clocksPerLine] <-
                 match x with
-                    |   0 -> fetchP  0
-                    |   1 -> fetchS0 0
-                    |   2 -> fetchS1 0
-                    |   3 -> fetchS2 0
-                    |   4 -> fetchP  1
-                    |   5 -> fetchS0 1
-                    |   6 -> fetchS1 1
-                    |   7 -> fetchS2 1
-                    |   _ -> noop
+                    | x when x < 32 && (x &&& 3) = 0 ->  fetchP  (x >>> 2)
+                    | x when x < 32 && (x &&& 3) = 1 ->  fetchS0 (x >>> 2)
+                    | x when x < 32 && (x &&& 3) = 2 ->  fetchS1 (x >>> 2)
+                    | x when x < 32 && (x &&& 3) = 3 ->  fetchS2 (x >>> 2)
+                    | x when x < 41 && (x &&& 1) = 0 ->  fetchR
+                    | x when x < 121 && (x &&& 1) = 1 -> fetchC  ((x - 41) >>> 1)
+                    | x when x < 121 && (x &&& 1) = 0 -> fetchG  ((x - 41) >>> 1)
+                    | x when x &&& 0x1 = 0            -> fetchI
+                    | _ ->                                 noop
 
     let getBitmask (arr:bool[]) =
         (if arr.[0] then 0x01 else 0x00) |||

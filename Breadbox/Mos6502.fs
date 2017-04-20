@@ -4,14 +4,18 @@
 // Ported from Bizhawk's C# core.
 
 [<Sealed>]
-type Mos6502Configuration(lxaConstant:int, hasDecimalMode:bool, read:System.Func<int, int>, write:System.Action<int, int>, ready:System.Func<bool>, irq:System.Func<bool>, nmi:System.Func<bool>) =
+type Mos6502Configuration (lxaConstant:int, hasDecimalMode:bool, read:int->int, write:int*int->unit, ready:unit->bool, irq:unit->bool, nmi:unit->bool) =
     member val LxaConstant = lxaConstant
     member val HasDecimalMode = hasDecimalMode
-    member val Ready = ready.Invoke
-    member val Irq = irq.Invoke
-    member val Nmi = nmi.Invoke
-    member val Read = read.Invoke
-    member val Write = write.Invoke
+    member val Ready = ready
+    member val Irq = irq
+    member val Nmi = nmi
+    member val Read = read
+    member val Write = write
+
+    // For C# delegate interop
+    new (lxaConstant:int, hasDecimalMode:bool, read:System.Func<int, int>, write:System.Action<int, int>, ready:System.Func<bool>, irq:System.Func<bool>, nmi:System.Func<bool>) =
+        Mos6502Configuration(lxaConstant, hasDecimalMode, read.Invoke, write.Invoke, ready.Invoke, irq.Invoke, nmi.Invoke)
 
 [<Sealed>]
 type Mos6502(config:Mos6502Configuration) =
