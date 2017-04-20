@@ -892,24 +892,15 @@ type Mos6502(config:Mos6502Configuration) =
     let NopOp () =
         ReadMemoryS <| ignore
 
-    let EndISpecial () =
-        opcode <- VopFetch1
+    let EndCommon vop () =
+        opcode <- vop
         mi <- -1
-        restart <- true
-        true
 
-    let EndSuppressInterrupt () =
-        opcode <- VopFetch1NoInterrupt
-        mi <- -1
-        restart <- true
-        true
+    let EndISpecial = Fetch1 << EndCommon VopFetch1
 
-    let End () =
-        opcode <- VopFetch1
-        mi <- -1
-        iFlagPending <- i
-        restart <- true
-        true
+    let EndSuppressInterrupt = Fetch1Real << EndCommon VopFetch1NoInterrupt
+
+    let End = EndISpecial << fun _ -> iFlagPending <- i
 
     let EndBranchSpecial = End
 
