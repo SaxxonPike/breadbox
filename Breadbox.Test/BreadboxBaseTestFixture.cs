@@ -32,8 +32,23 @@ namespace Breadbox
 
             _cpuConfig = new Lazy<Mos6502Configuration>(() =>
             {
-                return new Mos6502Configuration(0xFF, true, System.Object.Read, System.Object.Write,
-                    () => System.Object.Ready, () => System.Object.Irq, () => System.Object.Nmi);
+                var system = System.Object;
+
+                int ReadProxy(int address)
+                {
+                    var value = system.Read(address);
+                    Console.WriteLine($"CPU READ   ${address:x4} -> ${value:x2}");
+                    return value;
+                }
+
+                void WriteProxy(int address, int value)
+                {
+                    system.Write(address, value);
+                    Console.WriteLine($"CPU WRITE  ${address:x4} -> ${value:x2}");
+                }
+
+                return new Mos6502Configuration(0xFF, true, ReadProxy, WriteProxy,
+                    () => system.Ready, () => system.Irq, () => system.Nmi);
             });
 
             _gpuConfig = new Lazy<Mos6567Configuration>(() => new Mos6567Configuration(System.Object.Read, 263, 65, 0x00D, 0x029, 0x19C, 0x00D));
