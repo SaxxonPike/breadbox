@@ -37,8 +37,6 @@ type Mos6567(config:Mos6567Configuration) =
 
     let mnx = Array.create 8 0x000
     let mny = Array.create 8 0x00
-    let mutable ecm = false
-    let mutable bmm = false
     let mutable den = false
     let mutable rsel = false
     let mutable yscroll = 0x0
@@ -47,7 +45,6 @@ type Mos6567(config:Mos6567Configuration) =
     let mutable lpy = 0x00
     let mne = Array.create 8 false
     let mutable res = false
-    let mutable mcm = false
     let mutable csel = false
     let mutable xscroll = 0x0
     let mnye = Array.create 8 false
@@ -70,160 +67,121 @@ type Mos6567(config:Mos6567Configuration) =
     let bnc = Array.create 4 0x0
     let mmn = Array.create 2 0x0
     let mnc = Array.create 8 0x0
+
+    // Raster interrupt compare value
     let mutable rasterI = 0x000
 
+    // Sprite pointer
     let mpn = Array.create 8 0x00
+
+    // Sprite fetch index
     let mcn = Array.create 8 0x00
+
+    // Sprite data shift register
     let msr = Array.create 8 0x000000
+
+    // Refresh fetch address
     let mutable refresh = 0x00
     
+    // Video matrix
     let matrix = Array.create 40 0x000
+
+    // Graphics data fetch buffer
     let mutable gbuffer = 0x00
+
+    // Color matrix data fetch buffer
     let mutable cbuffer = 0x000
+
+    // Color matrix data latch
     let mutable coutput = 0x000
+
+    // Graphics data shift register
     let mutable gsr = 0x00
+
+    // Badline status
     let mutable badline = false
 
+    // Idle state status
+    let mutable idleState = false
+
+    // Graphics data fetch modes (bitfield: 1=MCM, 2=BMM, 4=ECM)
+    let mutable graphicsMode = 0
+    let fetchGAddressModes = Array.init 8 <| fun i ->
+        let inline ec address = address &&& 0x39FF
+        let inline text index = if idleState then 0x3FFF else (((matrix.[index] &&& 0xFF) <<< 3) ||| cb ||| rc)
+        let inline bitmap _ = if idleState then 0x3FFF else ((vc <<< 3) ||| (cb &&& 0x2000) ||| rc)
+        match (i &&& 0x2) <> 0, (i &&& 0x4) <> 0 with
+            | false, false -> text
+            | false, true  -> text >> ec
+            | true,  false -> bitmap
+            | true,  true  -> bitmap >> ec
+
+    // Fetch idle
     let fetchI () =
         ReadMemory 0x3FFF |> ignore
 
+    // Fetch sprite pointer
     let fetchP index () =
         mpn.[index] <- (ReadMemory (0x03F8 ||| index)) <<< 6
 
+    // Fetch upper 8 bits of sprite data
     let fetchS0 index () =
         msr.[index] <- msr.[index] ||| ((ReadMemory (mpn.[index] ||| mcn.[index])) <<< 16)
 
+    // Fetch middle 8 bits of sprite data
     let fetchS1 index () =
         msr.[index] <- msr.[index] ||| ((ReadMemory (mpn.[index] ||| mcn.[index])) <<< 8)
 
+    // Fetch lower 8 bits of sprite data
     let fetchS2 index () =
         msr.[index] <- msr.[index] ||| (ReadMemory (mpn.[index] ||| mcn.[index]))
-
+    
+    // Fetch refresh
     let fetchR () =
         let newRefresh = (refresh - 1) &&& 0xFF
         ReadMemory 0x3F00 ||| newRefresh |> ignore
         refresh <- newRefresh
 
+    // Current color matrix fetch mode
+    let mutable fetchCInternal = fun _ -> 0x000
+
+    // Fetch color matrix data
     let fetchC index () =
-        if badline then
-            let data = ReadMemory (vm ||| vc)
-            matrix.[index] <- data
-            cbuffer <- data
-        else
-            cbuffer <- matrix.[index]
+        cbuffer <- fetchCInternal index
 
-    let getFetchGInternal () =
-        let inline ec address = address &&& 0x39FF
-        let inline text index = ((matrix.[index] &&& 0xFF) <<< 3) ||| cb ||| rc
-        let inline bitmap index = (vc <<< 3) ||| (cb &&& 0x2000) ||| rc
-        match bmm, ecm with
-            | false, false -> text
-            | false, _     -> text >> ec
-            | true, false  -> bitmap
-            | _,    _      -> bitmap >> ec
-
-    let mutable fetchGInternal = getFetchGInternal()
-
+    // Fetch graphics data
     let fetchG index () =
-        gbuffer <- (ReadMemory <| fetchGInternal index)
+        gbuffer <- (ReadMemory <| fetchGAddressModes.[graphicsMode] index)
 
-    let getClockMux mcm bmm ecm =
-        let getDataOutput =
-            let inline singleColor c g = ((g &&& 0x1) <<< 1) ||| (g &&& 0x1)
-            let inline multiColor c g = g &&& 0x3
-            let inline multiColorText c g = if (c &&& 0x800) <> 0 then multiColor c g else singleColor c g
-            match mcm,   bmm with
-                | false, _     -> singleColor
-                | _,     false -> multiColorText
-                | _,     _     -> multiColor
-        
-        let getDataColorOutput =
-            let inline invalid c d = 0
-            let inline extraColorText c d = if (d <> 0) then (c >>> 8) else bnc.[(c >>> 6) &&& 0x3]
-            let inline singleColorText c d = if (d <> 0) then (c >>> 8) else bnc.[0]
-            let inline multiColorText c d = if (d < 3) then bnc.[d] else (c >>> 8)
-            let inline singleColorBitmap c d = (if (d <> 0) then c else (c >>> 4)) &&& 0xF
-            let inline multiColorBitmap c d =
-                match d with
-                    | 0b01 -> (c >>> 4) &&& 0xF 
-                    | 0b10 -> c &&& 0xF
-                    | 0b11 -> c >>> 8
-                    | _ -> bnc.[0]
-            match mcm,   bmm,   ecm with
-                | false, false, true  -> extraColorText
-                | _,     _,     true  -> invalid
-                | false, false, _     -> singleColorText
-                | false, true,  _     -> singleColorBitmap
-                | _,     false, _     -> multiColorText
-                | _,     _,     _     -> multiColorBitmap
+    // Change the badline status
+    let setBadline newBadline =
+        badline <- newBadline
+
+        fetchCInternal <-
+            if newBadline then
+                fun index ->
+                    let data = ReadMemory (vm ||| vc)
+                    matrix.[index] <- data
+                    cbuffer <- data
+                    data
+            else
+                fun index ->
+                    let data = matrix.[index]
+                    cbuffer <- data
+                    data
     
-        let getDataColorIdleOutput =
-            let inline black c d = 0
-            let inline blackPlusBackground c d = if (d <> 0) then 0 else bnc.[0]
-            match mcm,   bmm,   ecm with
-                | false, false, true  -> blackPlusBackground
-                | _,     _,     true
-                | false, true,  false -> black
-                | _,     _,     _     -> blackPlusBackground
+    // Change the graphics mode
+    let setGraphicsMode newMode =
+        graphicsMode <- newMode
 
-        let inline getSpriteOutput index =
-            if mnmc.[index] then
-                msr.[index] &&& 0x3
-            else
-                (msr.[index] &&& 0x1) <<< 1
 
-        let inline getSpriteColorOutput index d =
-            if d = 0b10 then mnc.[index] else mmn.[d >>> 1]
 
-        let inline collideSprites d =
-            let mutable frontMost = -1
-            let mutable spriteCollision = 0x00
-            let mutable dataCollision = 0x00
-            for sprite = 0 to 7 do
-                let output = getSpriteOutput sprite
-                if (output <> 0) then
-                    if (frontMost >= 0) then
-                        mnm.[sprite] <- true
-                        mnm.[frontMost] <- true
-                    else
-                        frontMost <- sprite
-                    if (d >= 0b10) then
-                        mnd.[sprite] <- true
-            frontMost
 
-        fun _ ->
-            let graphicsDataOutput = getDataOutput coutput gsr
-            let visibleSpriteNumber = collideSprites graphicsDataOutput
-            if visibleSpriteNumber < 0 || mndp.[visibleSpriteNumber] then
-                getDataColorOutput coutput graphicsDataOutput
-            else
-                getSpriteColorOutput visibleSpriteNumber (getSpriteOutput visibleSpriteNumber)
 
-    let timingX =
-        Array.init clocksPerLine <| fun x ->
-            match x with
-                | x when x <= hBlankStart -> x
-                | x when x - hBlankStart < holdClocks -> hBlankStart
-                | _ -> x - holdClocks
-            
-    let timingFetch =
-        let noop = fun () -> ()
-        let result = Array.init clocksPerLine <| fun x ->
-            match x with
-                | x when (x &&& 0x7) = 0x4 -> fetchI
-                | _ -> noop
-        for x = 0 to 125 do
-            result.[((x * 4) + fetchStart) % clocksPerLine] <-
-                match x with
-                    | x when x < 32 && (x &&& 3) = 0 ->  fetchP  (x >>> 2)
-                    | x when x < 32 && (x &&& 3) = 1 ->  fetchS0 (x >>> 2)
-                    | x when x < 32 && (x &&& 3) = 2 ->  fetchS1 (x >>> 2)
-                    | x when x < 32 && (x &&& 3) = 3 ->  fetchS2 (x >>> 2)
-                    | x when x < 41 && (x &&& 1) = 0 ->  fetchR
-                    | x when x < 121 && (x &&& 1) = 1 -> fetchC  ((x - 41) >>> 1)
-                    | x when x < 121 && (x &&& 1) = 0 -> fetchG  ((x - 41) >>> 1)
-                    | x when x &&& 0x1 = 0            -> fetchI
-                    | _ ->                                 noop
+
+
+
+
 
     let getBitmask (arr:bool[]) =
         (if arr.[0] then 0x01 else 0x00) |||
@@ -263,8 +221,7 @@ type Mos6567(config:Mos6567Configuration) =
 
     let setControl1 value =
         rasterI <- rasterI &&& 0x0FF ||| ((value &&& 0x80) <<< 1)
-        ecm <- (value &&& 0x40) <> 0
-        bmm <- (value &&& 0x20) <> 0
+        setGraphicsMode (((value &&& 0x60) >>> 4) ||| (graphicsMode &&& 0x1))
         den <- (value &&& 0x10) <> 0
         rsel <- (value &&& 0x08) <> 0
         yscroll <- (value &&& 0x07)
@@ -276,7 +233,7 @@ type Mos6567(config:Mos6567Configuration) =
 
     let setControl2 value =
         res <- (value &&& 0x20) <> 0
-        mcm <- (value &&& 0x10) <> 0
+        setGraphicsMode (((value &&& 0x10) >>> 4) ||| (graphicsMode &&& 0x6))
         csel <- (value &&& 0x08) <> 0
         xscroll <- (value &&& 0x7)
 
@@ -328,8 +285,7 @@ type Mos6567(config:Mos6567Configuration) =
 
     let getControl1 () =
         ((raster &&& 0x100) >>> 1) |||
-        (if ecm then 0x40 else 0x00) |||
-        (if bmm then 0x20 else 0x00) |||
+        ((graphicsMode &&& 0x6) <<< 4) |||
         (if den then 0x10 else 0x00) |||
         (if rsel then 0x08 else 0x00) |||
         yscroll
@@ -348,7 +304,7 @@ type Mos6567(config:Mos6567Configuration) =
     let getControl2 () =
         0xE0 |||
         (if res then 0x20 else 0x00) |||
-        (if mcm then 0x10 else 0x00) |||
+        ((graphicsMode &&& 0x1) <<< 4) |||
         (if csel then 0x08 else 0x00) |||
         xscroll
 
@@ -552,9 +508,17 @@ type Mos6567(config:Mos6567Configuration) =
     member this.Ba = ba
     member this.Aec = aec
 
-    member this.Bmm with get () = bmm and set (value) = bmm <- value
-    member this.Ecm with get () = ecm and set (value) = ecm <- value
-    member this.Mcm with get () = mcm and set (value) = mcm <- value
+    member this.Bmm
+        with get () = (graphicsMode &&& 0x2) <> 0
+        and set (value) = setGraphicsMode ((graphicsMode &&& 0x5) ||| (if value then 0x2 else 0x0))
+
+    member this.Ecm
+        with get () = (graphicsMode &&& 0x4) <> 0
+        and set (value) = setGraphicsMode ((graphicsMode &&& 0x3) ||| (if value then 0x4 else 0x0))
+
+    member this.Mcm
+        with get () = (graphicsMode &&& 0x1) <> 0
+        and set (value) = setGraphicsMode ((graphicsMode &&& 0x6) ||| (if value then 0x1 else 0x0))
 
     member this.Peek address =
         peekRegister.[address &&& 0x3F] <| ()
