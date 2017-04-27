@@ -38,14 +38,14 @@ type Mos6567(config:Mos6567Configuration) =
     let mnx = Array.create 8 0x000
     let mny = Array.create 8 0x00
     let mutable den = false
-    let mutable rsel = false
+    let mutable rsel = 0x0
     let mutable yscroll = 0x0
     let mutable raster = 0x000
     let mutable lpx = 0x00
     let mutable lpy = 0x00
     let mne = Array.create 8 false
     let mutable res = false
-    let mutable csel = false
+    let mutable csel = 0x0
     let mutable xscroll = 0x0
     let mnye = Array.create 8 false
     let mutable vm = 0x0000
@@ -58,8 +58,8 @@ type Mos6567(config:Mos6567Configuration) =
     let mutable emmc = false
     let mutable embc = false
     let mutable erst = false
-    let mndp = Array.create 8 false
-    let mnmc = Array.create 8 false
+    let mndp = Array.create 8 0x0
+    let mnmc = Array.create 8 0x0
     let mnxe = Array.create 8 false
     let mnm = Array.create 8 false
     let mnd = Array.create 8 false
@@ -67,6 +67,12 @@ type Mos6567(config:Mos6567Configuration) =
     let bnc = Array.create 4 0x0
     let mmn = Array.create 2 0x0
     let mnc = Array.create 8 0x0
+
+    // Border unit compare values
+    let rselTop = [| 0x037, 0x033 |]
+    let rselBottom = [| 0x0F7, 0x0FB |]
+    let cselLeft = [| 0x01F, 0x018 |]
+    let cselRight = [| 0x14F, 0x158 |]
 
     // Raster interrupt compare value
     let mutable rasterI = 0x000
@@ -77,8 +83,9 @@ type Mos6567(config:Mos6567Configuration) =
     // Sprite fetch index
     let mcn = Array.create 8 0x00
 
-    // Sprite data shift register
+    // Sprite data shift register + enable
     let msr = Array.create 8 0x000000
+    let msre = Array.create 8 0x0
 
     // Refresh fetch address
     let mutable refresh = 0x00
@@ -101,21 +108,147 @@ type Mos6567(config:Mos6567Configuration) =
     // Badline status
     let mutable badline = false
 
-    // Idle state status
-    let mutable idleState = false
-
-    // Graphics data fetch modes (bitfield: 1=MCM, 2=BMM, 4=ECM)
+    // Graphics data fetch modes (bitfield: 1=MCM, 2=BMM, 4=ECM, 8=idle state)
+    let graphicsModeCount = 16
     let mutable graphicsMode = 0
-    let fetchGAddressModes = Array.init 8 <| fun i ->
-        let inline ec address = address &&& 0x39FF
-        let inline text index = if idleState then 0x3FFF else (((matrix.[index] &&& 0xFF) <<< 3) ||| cb ||| rc)
-        let inline bitmap _ = if idleState then 0x3FFF else ((vc <<< 3) ||| (cb &&& 0x2000) ||| rc)
-        match (i &&& 0x2) <> 0, (i &&& 0x4) <> 0 with
-            | false, false -> text
-            | false, true  -> text >> ec
-            | true,  false -> bitmap
-            | true,  true  -> bitmap >> ec
+    let fetchGAddressModes = 
+        let ec address = address &&& 0x39FF
+        let text index = (((matrix.[index] &&& 0xFF) <<< 3) ||| cb ||| rc)
+        let bitmap _ = ((vc <<< 3) ||| (cb &&& 0x2000) ||| rc)
+        let idle _ = 0x3FFF
+        Array.init graphicsModeCount <| fun i ->
+            match (i &&& 0x2) <> 0, (i &&& 0x4) <> 0, (i &&& 0x8) <> 0 with
+                | false, false, false -> text
+                | false, true,  false -> text >> ec
+                | true,  false, false -> bitmap
+                | true,  true,  false -> bitmap >> ec
+                | _,     false, true  -> idle
+                | _,     true,  true  -> idle >> ec
 
+    // Foreground/Background data bit modes
+    let synthGDataModes =
+        let oneBit g _ = (g &&& 1) ||| ((g &&& 1) <<< 1)
+        let twoBits g _ = (g &&& 3)
+        let multiColorTextModes = [| oneBit; twoBits |]
+        let multiColorText g c = multiColorTextModes.[c >>> 11] g c
+        Array.init graphicsModeCount <| fun i ->
+            match (i &&& 0x1) <> 0, (i &&& 0x2) <> 0 with
+                | false, false -> oneBit
+                | false, true  -> oneBit
+                | true,  false -> multiColorText
+                | true,  true  -> twoBits
+
+    // Graphics color modes
+    let synthGColorModes = 
+        let upperColor c = (c >>> 8)
+        let upperColorMulti c = (c >>> 8) &&& 0x7
+        let midColor c = (c >>> 4) &&& 0xF
+        let lowColor c = (c &&& 0xF)
+        let backgroundColor _ = bnc.[0]
+        let color1 _ = bnc.[1]
+        let color2 _ = bnc.[2]
+        let extraColor c = bnc.[(c >>> 6) &&& 0x3]
+        let black _ = 0
+        let singleColorTextMode = [| backgroundColor, backgroundColor, upperColor, upperColor |]
+        let multiColorTextMode = [| backgroundColor, color1, color2, upperColorMulti |]
+        let singleColorBitmapMode = [| lowColor, lowColor, midColor, midColor |]
+        let multiColorBitmapMode = [| backgroundColor, midColor, lowColor, upperColor |]
+        let extraColorMode = [| extraColor, extraColor, upperColor, upperColor |]
+        let idleSingleColorTextMode = [| backgroundColor, backgroundColor, black, black |]
+        let idleMultiColorTextMode = [| backgroundColor, color1, color2, black |]
+        let idleSingleColorBitmapMode = [| black, black, black, black |]
+        let idleMultiColorBitmapMode = [| backgroundColor, black, black, black |]
+        let idleExtraColorMode = [| backgroundColor, backgroundColor, black, black |]
+        let allBlack = [| black, black, black, black |]
+        Array.init graphicsModeCount <| fun i ->
+            match (i &&& 0x1) <> 0, (i &&& 0x2) <> 0, (i &&& 0x4) <> 0, (i &&& 0x8) <> 0 with
+                | false, false, false, false -> singleColorTextMode
+                | true,  false, false, false -> multiColorTextMode
+                | false, true,  false, false -> singleColorBitmapMode
+                | true,  true,  false, false -> multiColorBitmapMode
+                | false, false, true,  false -> extraColorMode
+                | false, false, false, true  -> idleSingleColorTextMode
+                | true,  false, false, true  -> idleMultiColorTextMode
+                | false, true,  false, true  -> idleSingleColorBitmapMode
+                | true,  true,  false, true  -> idleMultiColorBitmapMode
+                | false, false, true,  true  -> idleExtraColorMode
+                | _,     _,     _,     _     -> allBlack
+            
+    // Sprite data bit modes (1=MC, 2=DP)
+    let spriteModeCount = 4
+    let spriteMode = Array.zeroCreate 8
+    let synthSDataModes =
+        let oneBit s = (s &&& 1)
+        let twoBits s = (s &&& 3)
+        Array.init spriteModeCount <| fun i ->
+            match (i &&& 0x1) <> 0 with
+                | false -> oneBit
+                | true  -> twoBits
+
+    // Sprite color modes
+    let synthSColorModes =
+        let noColor _ = 0
+        let multi0 _ = mmn.[0]
+        let multi1 _ = mmn.[1]
+        let mobColor = id
+        let anyColorMode = [| noColor, multi0, mobColor, multi1 |]
+        Array.init spriteModeCount <| fun _ ->
+            anyColorMode
+    
+    // Sprite priority modes
+    let synthSPriorityModes =
+        let showSpriteColor spriteColor _ _ = spriteColor()
+        let showGraphicsColor _ _ graphicsColor = graphicsColor()
+        let backgroundModes = [| showSpriteColor; showGraphicsColor |]
+        let background spriteColor graphicsData graphicsColor = backgroundModes.[graphicsData >>> 1] spriteColor graphicsData graphicsColor
+        Array.init spriteModeCount <| fun i ->
+            match (i &&& 0x2) <> 0 with
+                | false -> showSpriteColor
+                | true  -> background
+
+    // Sprite + Graphics mux
+    let muxSG =
+        // Lookup table for sprite/sprite collisions
+        let spriteCollisionMap = Array.init 0x100 <| fun i _ ->
+            match i with
+                | 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 | 0x40 | 0x80 -> 0x00
+                | _ -> i
+        // Bits in the collision mask per sprite
+        let spriteCollisionOutput = Array.init 8 <| fun i -> 1 <<< i
+        // Sprite data source depending if shift register is enabled
+        let shiftRegisterSource = [|
+            fun _ -> 0;
+            fun i -> synthSDataModes.[spriteMode.[i]] <| msr.[i]
+        |]
+        // Determine sprite/sprite priority
+        let prioritySort = Array.init 8 <| fun s ->
+            Array.init 4 <| fun i ->
+                match i with
+                    | 0 -> id
+                    | _ ->
+                        let result = s ||| (i <<< 3)
+                        fun _ -> result
+        // Determine sprite collision
+        let collisionSort = Array.init 8 <| fun s ->
+            Array.init 4 <| fun i ->
+                let bit = spriteCollisionOutput.[s]
+                match i with
+                    | 0 -> id
+                    | _ -> fun j -> j ||| s
+        // Get actual sprite color output, index 8 is no sprite
+        let spriteColorOut = Array.init 9 <| fun s ->
+            match s with
+                | s when s >= 0 && s < 8 ->
+                    synthSPriorityModes.[spriteMode.[s]]
+                | _ ->
+                    fun _ _ graphicsColor -> graphicsColor()
+        let graphicsOutput = fun _ ->
+            synthGDataModes.[graphicsMode] gsr coutput
+        
+        fun _ -> 0
+
+    let test1 = muxSG ()
+        
     // Fetch idle
     let fetchI () =
         ReadMemory 0x3FFF |> ignore
@@ -172,9 +305,23 @@ type Mos6567(config:Mos6567Configuration) =
     
     // Change the graphics mode
     let setGraphicsMode newMode =
-        graphicsMode <- newMode
+        graphicsMode <- (graphicsMode &&& (~~~0x07)) ||| (newMode &&& 0x07)
 
+    // Change the idle state
+    let setIdleState newIdleState =
+        graphicsMode <- (graphicsMode &&& (~~~0x08)) ||| (if newIdleState then 0x08 else 0x00)
 
+    // Border status
+    let mutable borderMode = 0x0
+    let borderModeCount = 4
+
+    // Change the vertical border state
+    let setVerticalBorder newState =
+        borderMode <- (borderMode &&& (~~~0x01)) ||| (if newState then 0x01 else 0x00)
+
+    // Change the main border state
+    let setMainBorder newState =
+        borderMode <- (borderMode &&& (~~~0x02)) ||| (if newState then 0x02 else 0x00)
 
 
 
@@ -203,6 +350,26 @@ type Mos6567(config:Mos6567Configuration) =
         arr.[6] <- (value &&& 0x40) <> 0
         arr.[7] <- (value &&& 0x80) <> 0
 
+    let getValueMask (arr:int[]) =
+        arr.[0] |||
+        (arr.[1] <<< 1) |||
+        (arr.[2] <<< 2) |||
+        (arr.[3] <<< 3) |||
+        (arr.[4] <<< 4) |||
+        (arr.[5] <<< 5) |||
+        (arr.[6] <<< 6) |||
+        (arr.[7] <<< 7)
+
+    let setValueMask (arr:int[]) value =
+        arr.[0] <- (value &&& 0x01)
+        arr.[1] <- (value &&& 0x02)
+        arr.[2] <- (value &&& 0x04)
+        arr.[3] <- (value &&& 0x08)
+        arr.[4] <- (value &&& 0x10)
+        arr.[5] <- (value &&& 0x20)
+        arr.[6] <- (value &&& 0x40)
+        arr.[7] <- (value &&& 0x80)
+
     let setMnxLow index value =
         mnx.[index] <- mnx.[index] &&& 0x100 ||| value
     
@@ -223,7 +390,7 @@ type Mos6567(config:Mos6567Configuration) =
         rasterI <- rasterI &&& 0x0FF ||| ((value &&& 0x80) <<< 1)
         setGraphicsMode (((value &&& 0x60) >>> 4) ||| (graphicsMode &&& 0x1))
         den <- (value &&& 0x10) <> 0
-        rsel <- (value &&& 0x08) <> 0
+        rsel <- (value &&& 0x08) >>> 3
         yscroll <- (value &&& 0x07)
 
     let setRaster value =
@@ -234,7 +401,7 @@ type Mos6567(config:Mos6567Configuration) =
     let setControl2 value =
         res <- (value &&& 0x20) <> 0
         setGraphicsMode (((value &&& 0x10) >>> 4) ||| (graphicsMode &&& 0x6))
-        csel <- (value &&& 0x08) <> 0
+        csel <- (value &&& 0x08) >>> 3
         xscroll <- (value &&& 0x7)
 
     let setSpriteYExpansion = setBitmask mnye
@@ -249,9 +416,9 @@ type Mos6567(config:Mos6567Configuration) =
         embc <- (value &&& 0x02) <> 0
         erst <- (value &&& 0x01) <> 0
 
-    let setSpritePriority = setBitmask mndp
+    let setSpritePriority = setValueMask mndp
 
-    let setSpriteMulticolorEnable = setBitmask mnmc
+    let setSpriteMulticolorEnable = setValueMask mnmc
     
     let setSpriteXExpansion = setBitmask mnxe
 
@@ -287,7 +454,7 @@ type Mos6567(config:Mos6567Configuration) =
         ((raster &&& 0x100) >>> 1) |||
         ((graphicsMode &&& 0x6) <<< 4) |||
         (if den then 0x10 else 0x00) |||
-        (if rsel then 0x08 else 0x00) |||
+        (rsel <<< 3) |||
         yscroll
 
     let getRaster () =
@@ -305,7 +472,7 @@ type Mos6567(config:Mos6567Configuration) =
         0xE0 |||
         (if res then 0x20 else 0x00) |||
         ((graphicsMode &&& 0x1) <<< 4) |||
-        (if csel then 0x08 else 0x00) |||
+        (csel <<< 3) |||
         xscroll
 
     let getSpriteYExpansion () = getBitmask mnye
@@ -330,9 +497,9 @@ type Mos6567(config:Mos6567Configuration) =
         (if erst then 0x01 else 0x00) |||
         0xF0
 
-    let getSpritePriority () = getBitmask mndp
+    let getSpritePriority () = getValueMask mndp
 
-    let getSpriteMulticolorEnable () = getBitmask mnmc
+    let getSpriteMulticolorEnable () = getValueMask mnmc
 
     let getSpriteXExpansion () = getBitmask mnxe
 
@@ -354,7 +521,9 @@ type Mos6567(config:Mos6567Configuration) =
 
     let clearSpriteDataCollision () = setBitmask mnd 0
 
+    // Read a register without side effects
     let peekRegister = [|
+        // 0x00
         getMnxLow 0;
         getMny 0;
         getMnxLow 1;
@@ -363,6 +532,7 @@ type Mos6567(config:Mos6567Configuration) =
         getMny 2;
         getMnxLow 3;
         getMny 3;
+        // 0x08
         getMnxLow 4;
         getMny 4;
         getMnxLow 5;
@@ -371,7 +541,7 @@ type Mos6567(config:Mos6567Configuration) =
         getMny 6;
         getMnxLow 7;
         getMny 7;
-
+        // 0x10
         getMnxHigh;
         getControl1;
         getRaster;
@@ -380,6 +550,7 @@ type Mos6567(config:Mos6567Configuration) =
         getSpriteEnable;
         getControl2;
         getSpriteYExpansion;
+        // 0x18
         getMemoryPointers;
         getInterruptRegisters;
         getInterruptEnable;
@@ -388,7 +559,7 @@ type Mos6567(config:Mos6567Configuration) =
         getSpriteXExpansion;
         getSpriteSpriteCollision;
         getSpriteDataCollision;
-
+        // 0x20
         getBorderColor;
         getBackgroundColor 0;
         getBackgroundColor 1;
@@ -397,6 +568,7 @@ type Mos6567(config:Mos6567Configuration) =
         getSpriteMulticolor 0;
         getSpriteMulticolor 1;
         getSpriteColor 0;
+        // 0x28
         getSpriteColor 1;
         getSpriteColor 2;
         getSpriteColor 3;
@@ -405,7 +577,7 @@ type Mos6567(config:Mos6567Configuration) =
         getSpriteColor 6;
         getSpriteColor 7;
         getUnconnected;
-
+        // 0x30
         getUnconnected;
         getUnconnected;
         getUnconnected;
@@ -414,6 +586,7 @@ type Mos6567(config:Mos6567Configuration) =
         getUnconnected;
         getUnconnected;
         getUnconnected;
+        // 0x38
         getUnconnected;
         getUnconnected;
         getUnconnected;
@@ -424,13 +597,16 @@ type Mos6567(config:Mos6567Configuration) =
         getUnconnected;
     |]
 
+    // Read a register considering side effects
     let readRegister = Array.init peekRegister.Length <| fun i ->
         match i with
             | 0x1E -> clearSpriteSpriteCollision >> peekRegister.[i]
             | 0x1F -> clearSpriteDataCollision >> peekRegister.[i]
             | _ -> peekRegister.[i]
-
+    
+    // Write a register without side effects
     let pokeRegister = [|
+        // 0x00
         setMnxLow 0;
         setMny 0;
         setMnxLow 1;
@@ -439,6 +615,7 @@ type Mos6567(config:Mos6567Configuration) =
         setMny 2;
         setMnxLow 3;
         setMny 3;
+        // 0x08
         setMnxLow 4;
         setMny 4;
         setMnxLow 5;
@@ -447,7 +624,7 @@ type Mos6567(config:Mos6567Configuration) =
         setMny 6;
         setMnxLow 7;
         setMny 7;
-
+        // 0x10
         setMnxHigh;
         setControl1;
         setRaster;
@@ -456,6 +633,7 @@ type Mos6567(config:Mos6567Configuration) =
         setSpriteEnable;
         setControl2;
         setSpriteYExpansion;
+        // 0x18
         setMemoryPointers;
         ignore;
         setInterruptEnable;
@@ -464,7 +642,7 @@ type Mos6567(config:Mos6567Configuration) =
         setSpriteXExpansion;
         ignore;
         ignore;
-
+        // 0x20
         setBorderColor;
         setBackgroundColor 0;
         setBackgroundColor 1;
@@ -473,6 +651,7 @@ type Mos6567(config:Mos6567Configuration) =
         setSpriteMulticolor 0;
         setSpriteMulticolor 1;
         setSpriteColor 0;
+        // 0x28
         setSpriteColor 1;
         setSpriteColor 2;
         setSpriteColor 3;
@@ -481,7 +660,7 @@ type Mos6567(config:Mos6567Configuration) =
         setSpriteColor 6;
         setSpriteColor 7;
         ignore;
-
+        // 0x30
         ignore;
         ignore;
         ignore;
@@ -490,6 +669,7 @@ type Mos6567(config:Mos6567Configuration) =
         ignore;
         ignore;
         ignore;
+        // 0x38
         ignore;
         ignore;
         ignore;
@@ -500,6 +680,7 @@ type Mos6567(config:Mos6567Configuration) =
         ignore;
     |]
 
+    // Write a register considering side effects
     let writeRegister = Array.init pokeRegister.Length <| fun i ->
         match i with
             | _ -> pokeRegister.[i]
