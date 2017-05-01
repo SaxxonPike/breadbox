@@ -58,15 +58,16 @@ type Mos6567(config:Mos6567Configuration) =
     let mutable emmc = false
     let mutable embc = false
     let mutable erst = false
-    let mndp = Array.create 8 0x0
+    // this must be 9 due to an optimization in the prioritizer
+    let mndp = Array.create 9 0x0
     let mnmc = Array.create 8 0x0
     let mnxe = Array.create 8 false
-    let mnm = Array.create 8 false
-    let mnd = Array.create 8 false
+    let mutable mnm = 0x00
+    let mutable mnd = 0x00
     let mutable ec = 0x0
     let bnc = Array.create 4 0x0
     let mmn = Array.create 2 0x0
-    let mnc = Array.create 8 0x0
+    let mnc = Array.create 9 0x0
 
     // Border unit compare values
     let rselTop = [| 0x037, 0x033 |]
@@ -149,17 +150,17 @@ type Mos6567(config:Mos6567Configuration) =
         let color2 _ = bnc.[2]
         let extraColor c = bnc.[(c >>> 6) &&& 0x3]
         let black _ = 0
-        let singleColorTextMode = [| backgroundColor, backgroundColor, upperColor, upperColor |]
-        let multiColorTextMode = [| backgroundColor, color1, color2, upperColorMulti |]
-        let singleColorBitmapMode = [| lowColor, lowColor, midColor, midColor |]
-        let multiColorBitmapMode = [| backgroundColor, midColor, lowColor, upperColor |]
-        let extraColorMode = [| extraColor, extraColor, upperColor, upperColor |]
-        let idleSingleColorTextMode = [| backgroundColor, backgroundColor, black, black |]
-        let idleMultiColorTextMode = [| backgroundColor, color1, color2, black |]
-        let idleSingleColorBitmapMode = [| black, black, black, black |]
-        let idleMultiColorBitmapMode = [| backgroundColor, black, black, black |]
-        let idleExtraColorMode = [| backgroundColor, backgroundColor, black, black |]
-        let allBlack = [| black, black, black, black |]
+        let singleColorTextMode = [| backgroundColor; backgroundColor; upperColor; upperColor |]
+        let multiColorTextMode = [| backgroundColor; color1; color2; upperColorMulti |]
+        let singleColorBitmapMode = [| lowColor; lowColor; midColor; midColor |]
+        let multiColorBitmapMode = [| backgroundColor; midColor; lowColor; upperColor |]
+        let extraColorMode = [| extraColor; extraColor; upperColor; upperColor |]
+        let idleSingleColorTextMode = [| backgroundColor; backgroundColor; black; black |]
+        let idleMultiColorTextMode = [| backgroundColor; color1; color2; black |]
+        let idleSingleColorBitmapMode = [| black; black; black; black |]
+        let idleMultiColorBitmapMode = [| backgroundColor; black; black; black |]
+        let idleExtraColorMode = [| backgroundColor; backgroundColor; black; black |]
+        let allBlack = [| black; black; black; black |]
         Array.init graphicsModeCount <| fun i ->
             match (i &&& 0x1) <> 0, (i &&& 0x2) <> 0, (i &&& 0x4) <> 0, (i &&& 0x8) <> 0 with
                 | false, false, false, false -> singleColorTextMode
@@ -174,8 +175,8 @@ type Mos6567(config:Mos6567Configuration) =
                 | false, false, true,  true  -> idleExtraColorMode
                 | _,     _,     _,     _     -> allBlack
             
-    // Sprite data bit modes (1=MC, 2=DP)
-    let spriteModeCount = 4
+    // Sprite data bit modes (1=MC)
+    let spriteModeCount = 2
     let spriteMode = Array.zeroCreate 8
     let synthSDataModes =
         let oneBit s = (s &&& 1)
@@ -186,69 +187,48 @@ type Mos6567(config:Mos6567Configuration) =
                 | true  -> twoBits
 
     // Sprite color modes
-    let synthSColorModes =
+    let synthSColor =
         let noColor _ = 0
         let multi0 _ = mmn.[0]
         let multi1 _ = mmn.[1]
         let mobColor = id
-        let anyColorMode = [| noColor, multi0, mobColor, multi1 |]
-        Array.init spriteModeCount <| fun _ ->
-            anyColorMode
+        [| noColor; multi0; mobColor; multi1 |]
     
     // Sprite priority modes
-    let synthSPriorityModes =
-        let showSpriteColor spriteColor _ _ = spriteColor()
-        let showGraphicsColor _ _ graphicsColor = graphicsColor()
+    let muxSPriorityModes =
+        let showSpriteColor spriteColor _ _ = spriteColor
+        let showGraphicsColor _ _ graphicsColor = graphicsColor
         let backgroundModes = [| showSpriteColor; showGraphicsColor |]
         let background spriteColor graphicsData graphicsColor = backgroundModes.[graphicsData >>> 1] spriteColor graphicsData graphicsColor
-        Array.init spriteModeCount <| fun i ->
-            match (i &&& 0x2) <> 0 with
-                | false -> showSpriteColor
-                | true  -> background
+        [| showSpriteColor; background |]
 
-    // Sprite + Graphics mux
-    let muxSG =
-        // Lookup table for sprite/sprite collisions
-        let spriteCollisionMap = Array.init 0x100 <| fun i _ ->
+    // Perform sprite synthesizer priority detection, returns (data, color, priority, collisions)
+    let prioritizeS =
+        // Sprite synthesizer, returns (data, color)
+        let synthS index =
+            let data = synthSDataModes.[spriteMode.[index]](msr.[index])
+            data, synthSColor.[data] mnc.[index]
+        // Collision lookup tables
+        let collisionBits = Array.init 8 <| fun i -> (1 <<< i)
+        let collisionMap = Array.init 256 <| fun i ->
             match i with
                 | 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 | 0x40 | 0x80 -> 0x00
                 | _ -> i
-        // Bits in the collision mask per sprite
-        let spriteCollisionOutput = Array.init 8 <| fun i -> 1 <<< i
-        // Sprite data source depending if shift register is enabled
-        let shiftRegisterSource = [|
-            fun _ -> 0;
-            fun i -> synthSDataModes.[spriteMode.[i]] <| msr.[i]
-        |]
-        // Determine sprite/sprite priority
-        let prioritySort = Array.init 8 <| fun s ->
-            Array.init 4 <| fun i ->
+        // Prioritizer
+        fun () ->
+            let rec loop = fun i ->
                 match i with
-                    | 0 -> id
-                    | _ ->
-                        let result = s ||| (i <<< 3)
-                        fun _ -> result
-        // Determine sprite collision
-        let collisionSort = Array.init 8 <| fun s ->
-            Array.init 4 <| fun i ->
-                let bit = spriteCollisionOutput.[s]
-                match i with
-                    | 0 -> id
-                    | _ -> fun j -> j ||| s
-        // Get actual sprite color output, index 8 is no sprite
-        let spriteColorOut = Array.init 9 <| fun s ->
-            match s with
-                | s when s >= 0 && s < 8 ->
-                    synthSPriorityModes.[spriteMode.[s]]
-                | _ ->
-                    fun _ _ graphicsColor -> graphicsColor()
-        let graphicsOutput = fun _ ->
-            synthGDataModes.[graphicsMode] gsr coutput
-        
-        fun _ -> 0
+                    | -1, data, color, priority, collisions ->
+                        data, color, priority, collisionMap.[collisions]
+                    | i, data, color, priority, collisions ->
+                        loop <|
+                            match (synthS i) with
+                                | (c, d) when d <> 0x0 ->
+                                    i - 1, d, c, mndp.[i], collisions ||| collisionBits.[i]
+                                | _ ->
+                                    i - 1, data, color, priority, collisions
+            loop (7, 0, 0, 0, 0)
 
-    let test1 = muxSG ()
-        
     // Fetch idle
     let fetchI () =
         ReadMemory 0x3FFF |> ignore
@@ -322,7 +302,43 @@ type Mos6567(config:Mos6567Configuration) =
     // Change the main border state
     let setMainBorder newState =
         borderMode <- (borderMode &&& (~~~0x02)) ||| (if newState then 0x02 else 0x00)
+    
+    // Border modes (nonzero is engaged)
+    let borderModes =
+        Array.init borderModeCount <| fun i ->
+            match i with
+                | 0 -> id
+                | _ -> fun _ -> ec
 
+    // Graphics synthesizer, returns (data, color)
+    let synthG () =
+        // Vertical border disables graphics output, only B0C color
+        match (borderMode &&& 0x01) with
+            | 1 -> 0, bnc.[0]
+            | _ ->
+                let mode = graphicsMode
+                let data = synthGDataModes.[mode] gsr coutput
+                data, synthGColorModes.[mode].[data] coutput
+    
+    // Mux graphics and sprite data. Outputs color.
+    let muxGS () =
+        match prioritizeS(), synthG() with
+            | (0, _, _, _), (_, graphicsColor) ->
+                // No sprite output
+                graphicsColor
+            | (_, spriteColor, _, spriteCollisions), (graphicsData, _) when graphicsData < 0b10 ->
+                // Sprite output and background graphics
+                if mnm = 0 then
+                    mnm <- spriteCollisions
+                spriteColor
+            | (_, spriteColor, spritePriority, spriteCollisions), (graphicsData, graphicsColor) ->
+                // Sprite output and foreground graphics
+                if mnm = 0 then
+                    mnm <- spriteCollisions
+                if mnd = 0 then
+                    mnd <- spriteCollisions
+                muxSPriorityModes.[spritePriority] spriteColor graphicsData graphicsColor
+    
 
 
 
@@ -503,9 +519,9 @@ type Mos6567(config:Mos6567Configuration) =
 
     let getSpriteXExpansion () = getBitmask mnxe
 
-    let getSpriteSpriteCollision () = getBitmask mnm
+    let getSpriteSpriteCollision () = mnm
 
-    let getSpriteDataCollision () = getBitmask mnd
+    let getSpriteDataCollision () = mnd
 
     let getBorderColor () = ec ||| 0xF0
 
@@ -517,9 +533,9 @@ type Mos6567(config:Mos6567Configuration) =
 
     let getUnconnected () = 0xFF
 
-    let clearSpriteSpriteCollision () = setBitmask mnm 0
+    let clearSpriteSpriteCollision () = mnm <- 0x00
 
-    let clearSpriteDataCollision () = setBitmask mnd 0
+    let clearSpriteDataCollision () = mnd <- 0x00
 
     // Read a register without side effects
     let peekRegister = [|
