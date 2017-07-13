@@ -1,5 +1,7 @@
 # breadbox
 
+[![Build status](https://ci.appveyor.com/api/projects/status/efnhrx4vbu18t1o2?svg=true)](https://ci.appveyor.com/project/SaxxonPike/breadbox)
+
 MOS and (future) Commodore chip emulation in F#. These cores are designed to be accurate on the cycle level.
 
 ### Complete:
